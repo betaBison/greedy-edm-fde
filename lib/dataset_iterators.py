@@ -12,7 +12,9 @@ __date__ = "06 Sep 2022"
 
 import os
 
+import numpy as np
 import gnss_lib_py as glp
+from gnss_lib_py.utils import constants as consts
 
 class Android2021Iterator():
 
@@ -224,11 +226,49 @@ class SmartLocIterator():
         data_path = self.train_path
 
         trace_path = os.path.join(data_path,trace[0],trace[1])
-        # convert data to Measurement class
-
-        data = glp.SmartLocRaw(trace_path)
 
         print("smartLoc",trace[0],trace[1])
+
+        # convert data to Measurement class
+        data = glp.SmartLocRaw(trace_path)
+        print(min(data["gps_millis"]))
+        print(max(data["gps_millis"]))
+        data["gps_millis"] -= np.round((data["raw_pr_m"]/consts.C)*1E3,-2)
+        print(min(data["gps_millis"]))
+        print(max(data["gps_millis"]))
+
+        data.rename({"NLOS (0 == no, 1 == yes, 2 == No Information)":"fault_gt"},
+                    inplace=True)
+
+        print("adding smartLoc SV states")
+        data = glp.add_sv_states(data,
+                                 verbose=True)
+
+        # add corrected pseudorange
+        data["corr_pr_m"] = data["raw_pr_m"] + data["b_sv_m"]
+
+        # add ECEF coordinates
+        ecef_xyz = glp.geodetic_to_ecef(data[["lat_rx_gt_deg",
+                                              "lon_rx_gt_deg",
+                                              "alt_rx_gt_m"
+                                            ]])
+        data["x_rx_gt_m"] = ecef_xyz[0,:]
+        data["y_rx_gt_m"] = ecef_xyz[1,:]
+        data["z_rx_gt_m"] = ecef_xyz[2,:]
+        data.to_csv("example_smartloc_pre_wls.csv")
+
+        # estimate receiver clock bias
+        print("solving WLS for receiver clock bias")
+        wls_state_estimate = glp.solve_wls(data,
+                                           only_bias = True,
+                                           # delta_t_decimals=6,
+                                           receiver_state=data,
+                                           )
+
+        print("calculating residuals")
+        glp.solve_residuals(data,wls_state_estimate)
+
+        data.to_csv("example_smartloc.csv")
 
         output = self.run(data, data.copy(), trace)
 

@@ -4,3 +4,7 @@ __pycache__/
 
 # pyenv
 .python-version
+
+# ignore results and data
+results/
+data/
