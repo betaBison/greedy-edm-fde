@@ -5,6 +5,7 @@
 __authors__ = "D. Knowles"
 __date__ = "11 Aug 2023"
 
+import numpy as np
 import gnss_lib_py as glp
 import matplotlib.pyplot as plt
 
@@ -23,7 +24,7 @@ def main():
     # # iterate across dataset
     # android2022.iterate()
 
-    train_path_smart_loc = "/home/derek/datasets/smartloc/"
+    train_path_smart_loc = "/home/derek/datasets/smart_loc/"
     smartloc = SmartLocIterator(train_path_smart_loc)
     # overwrite run function with what you'd like to test
     smartloc.run = test_function
@@ -53,7 +54,19 @@ def test_function(derived, gt_data, trace):
     glp.plot_metric_by_constellation(derived,"residuals_m",
                                            prefix="minus_raw_1E3_"+trace[0],
                                            save=True)
-    # plt.show()
+    pr_residuals = derived.where("gnss_id","gps")["residuals_m"]
+
+    plt.figure()
+    plt.hist(pr_residuals, bins=1000)
+
+    plt.figure()
+    colors = np.where(derived["fault_gt"]==1,"r","b")
+    print(colors)
+    print(type(colors))
+    print(np.unique(colors))
+    plt.scatter(derived["residuals_m"],derived["cn0_dbhz"],c=colors,s=1)
+
+    plt.show()
     # glp.evaluate_fde(derived,"fault_gt",
     #                  fault_truth_row=row_name,
     #                  verbose=True)

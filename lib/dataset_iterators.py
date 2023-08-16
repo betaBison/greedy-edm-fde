@@ -231,39 +231,53 @@ class SmartLocIterator():
 
         # convert data to Measurement class
         data = glp.SmartLocRaw(trace_path)
-        print(min(data["gps_millis"]))
-        print(max(data["gps_millis"]))
-        data["gps_millis"] -= np.round((data["raw_pr_m"]/consts.C)*1E3,-2)
-        print(min(data["gps_millis"]))
-        print(max(data["gps_millis"]))
+        # data = data.where("NLOS (0 == no, 1 == yes, 2 == No Information)",0)
+        data["b_sv_m"] = 0
 
-        data.rename({"NLOS (0 == no, 1 == yes, 2 == No Information)":"fault_gt"},
-                    inplace=True)
+        data["gps_millis_original"] = data["gps_millis"]
 
-        print("adding smartLoc SV states")
-        data = glp.add_sv_states(data,
-                                 verbose=True)
+        for i in range(1):
+            print("loop:",i)
 
-        # add corrected pseudorange
-        data["corr_pr_m"] = data["raw_pr_m"] + data["b_sv_m"]
+            data["gps_millis"] = data["gps_millis_original"] \
+                               - np.round((data["raw_pr_m"]/consts.C)*1E3,-2) \
+                               # + np.round((data["b_sv_m"]/consts.C)*1E3,-2)
+            # data["gps_millis"] -= np.round((wls_state_estimate["rx_wls_b_m"]/consts.C)*1E3,-2)
 
-        # add ECEF coordinates
-        ecef_xyz = glp.geodetic_to_ecef(data[["lat_rx_gt_deg",
-                                              "lon_rx_gt_deg",
-                                              "alt_rx_gt_m"
-                                            ]])
-        data["x_rx_gt_m"] = ecef_xyz[0,:]
-        data["y_rx_gt_m"] = ecef_xyz[1,:]
-        data["z_rx_gt_m"] = ecef_xyz[2,:]
-        data.to_csv("example_smartloc_pre_wls.csv")
+            if i == 0:
+                data.rename({"NLOS (0 == no, 1 == yes, 2 == No Information)":"fault_gt"},
+                            inplace=True)
 
-        # estimate receiver clock bias
-        print("solving WLS for receiver clock bias")
-        wls_state_estimate = glp.solve_wls(data,
-                                           only_bias = True,
-                                           # delta_t_decimals=6,
-                                           receiver_state=data,
-                                           )
+            print("adding smartLoc SV states")
+            data = glp.add_sv_states(data,
+                                     verbose=True)
+
+            print("post add",np.mean(data["b_sv_m"]))
+            print("post add",np.max(data["b_sv_m"]))
+
+            # add corrected pseudorange
+            data["corr_pr_m"] = data["raw_pr_m"] + data["b_sv_m"]
+
+            # add ECEF coordinates
+            ecef_xyz = glp.geodetic_to_ecef(data[["lat_rx_gt_deg",
+                                                  "lon_rx_gt_deg",
+                                                  "alt_rx_gt_m"
+                                                ]])
+            data["x_rx_gt_m"] = ecef_xyz[0,:]
+            data["y_rx_gt_m"] = ecef_xyz[1,:]
+            data["z_rx_gt_m"] = ecef_xyz[2,:]
+            data.to_csv("example_smartloc_pre_wls.csv")
+
+            # estimate receiver clock bias
+            print("solving WLS for receiver clock bias")
+            wls_state_estimate = glp.solve_wls(data,
+                                               only_bias = True,
+                                               # delta_t_decimals=6,
+                                               receiver_state=data,
+                                               )
+
+            print("post rx",np.mean(wls_state_estimate["b_rx_wls_m"]))
+            print("post rx",np.max(wls_state_estimate["b_rx_wls_m"]))
 
         print("calculating residuals")
         glp.solve_residuals(data,wls_state_estimate)
