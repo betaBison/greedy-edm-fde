@@ -14,15 +14,15 @@ import matplotlib.pyplot as plt
 np.random.seed(314)
 
 locations = {
-              # "calgary" : (51.11056458625996, -114.1179704693596, 0.),
+              "calgary" : (51.11056458625996, -114.1179704693596, 0.),
               # "cape_town" : (-33.91700025297494, 18.403910329181112, 0.),
               # "hong_kong" : (22.327793473417067, 114.17122448832379, 0.),
               # "london" : (51.5097085796586, -0.16008158973060102, 0.),
               # "munich" : (48.16985710449595, 11.551627945697028, 0.),
               # "sao_paulo" : (-23.568026105263545, -46.736620380100675, 0.),
-              "stanford_oval" : (37.42984154652992, -122.16946303566934, 0.),
-              "sydney" : (-33.859749976799186, 151.22208557691505, 0.),
-              "zurich" : (47.407491810621345, 8.500756183071228, 0.),
+              # "stanford_oval" : (37.42984154652992, -122.16946303566934, 0.),
+              # "sydney" : (-33.859749976799186, 151.22208557691505, 0.),
+              # "zurich" : (47.407491810621345, 8.500756183071228, 0.),
              }
 
 results = glp.NavData()
@@ -34,19 +34,21 @@ for location_name, location_tuple in locations.items():
 
     print(csv_path)
     full_data_original = glp.NavData(csv_path=csv_path)
-    num_faults = [4,8,12]
+    # num_faults = [4,8,12]
+    num_faults = [4]
 
     for NUM_FAULTS in num_faults:
         print("faults:",NUM_FAULTS)
 
+        # bias_values = [60]
         bias_values = [20,40,60]
         # bias_values = [100]
 
         for bias_value in bias_values:
             print("bias:",bias_value)
 
-            # full_data = full_data_original.copy(cols=list(np.arange(182)))
-            full_data = full_data_original.copy()
+            full_data = full_data_original.copy(cols=list(np.arange(182)))
+            # full_data = full_data_original.copy()
 
 
             i = 0
@@ -88,7 +90,7 @@ for location_name, location_tuple in locations.items():
             full_data["raw_pr_m"] = raw_pr_m
 
             # thresholds = np.logspace(8,10,20)
-            thresholds = np.linspace(5,50,16)
+            thresholds = np.linspace(10,40,21)
             # thresholds = np.linspace(0.,1.,20)
             # [1E8,1E9,1E10]
             for threshold in thresholds:
@@ -118,17 +120,19 @@ for location_name, location_tuple in locations.items():
 
         results.to_csv(prefix="residual_"+str(len(results)))
 
-    # plt.figure()
 
-    # print(np.max(results["balanced_accuracy"]))
-    # glp.plot_metric(results,"threshold","balanced_accuracy",
-    #                 groupby="location_name",save=True)
-    # # plt.xscale("log")
-    # glp.plot_metric(results,"threshold","far",
-    #                 groupby="location_name",save=True)
-    # # plt.xscale("log")
-    # glp.plot_metric(results,"threshold","mdr",
-    #                 groupby="location_name",save=True)
+    print(np.max(results["balanced_accuracy"]))
+    glp.plot_metric(results,"threshold","balanced_accuracy",
+                    groupby="bias",save=True)
+    # plt.xscale("log")
+    glp.plot_metric(results,"threshold","far",
+                    groupby="bias",save=True)
+    # plt.xscale("log")
+    glp.plot_metric(results,"threshold","mdr",
+                    groupby="bias",save=True)
+    # plt.xscale("log")
+    glp.plot_metric(results,"threshold","timestep_mean_ms",
+                    groupby="bias",save=True)
     # plt.xscale("log")
 
     plt.show()
