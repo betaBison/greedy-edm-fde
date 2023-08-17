@@ -11,6 +11,8 @@ import numpy as np
 import gnss_lib_py as glp
 import matplotlib.pyplot as plt
 
+np.random.seed(314)
+
 locations = {
               "calgary" : (51.11056458625996, -114.1179704693596, 0.),
               "cape_town" : (-33.91700025297494, 18.403910329181112, 0.),
@@ -24,7 +26,6 @@ locations = {
              }
 
 results = glp.NavData()
-NUM_FAULTS = 4
 
 for location_name, location_tuple in locations.items():
     print("location name:",location_name)
@@ -32,88 +33,101 @@ for location_name, location_tuple in locations.items():
                             "simulated",location_name + "_20230314.csv")
 
     print(csv_path)
-    full_data = glp.NavData(csv_path=csv_path)
+    full_data_original = glp.NavData(csv_path=csv_path)
+    num_faults = [4,8,12]
 
-    full_data = full_data.copy(cols=list(np.arange(2000)))
+    for NUM_FAULTS in num_faults:
+        print("faults:",NUM_FAULTS)
 
-    bias_values = [20,40,60,80,100]
-    # bias_values = [100]
+        bias_values = [20,40,60]
+        # bias_values = [100]
 
-    for bias_value in bias_values:
-        print("bias:",bias_value)
+        for bias_value in bias_values:
+            print("bias:",bias_value)
 
-        i = 0
-        fault_gt = []
-        corr_pr_m = []
-        raw_pr_m = []
-        for timestamp, _, navdata in full_data.loop_time("gps_millis"):
+            # full_data = full_data_original.copy(cols=list(np.arange(182)))
+            full_data = full_data_original.copy()
 
-            # navdata = navdata.copy(cols=list(np.arange(10)))
-            if i % 100 == 0:
-                print("t:",timestamp)
 
-            # faulty_idx = list(np.random.randint(0,len(navdata),size=int(0.5*len(navdata))))
-            rand_index_order = np.arange(len(navdata))
-            np.random.shuffle(rand_index_order)
-            faulty_idxs = list(rand_index_order)[:NUM_FAULTS]
-            # print("\n\n\nfault:",faulty_idxs,navdata["gnss_sv_id",faulty_idxs])
+            i = 0
+            fault_gt = []
+            corr_pr_m = []
+            raw_pr_m = []
+            for timestamp, _, navdata in full_data.loop_time("gps_millis"):
 
-            # print("before",navdata["corr_pr_m"][faulty_idxs] )
-            navdata["corr_pr_m",faulty_idxs] += bias_value
-            navdata["raw_pr_m",faulty_idxs] += bias_value
-            corr_pr_m_subset = navdata["corr_pr_m"]
-            raw_pr_m_subset = navdata["raw_pr_m"]
-            # print("after",navdata["corr_pr_m"][faulty_idxs])
+                # navdata = navdata.copy(cols=list(np.arange(10)))
+                if i % 100 == 0:
+                    print("t:",timestamp)
 
-            fault_gt_subset = np.array([0] * len(navdata))
-            if bias_value != 0.:
-                fault_gt_subset[faulty_idxs] = 1
-            # print(fault_gt_subset)
-            fault_gt += list(fault_gt_subset)
-            corr_pr_m += list(corr_pr_m_subset)
-            raw_pr_m += list(raw_pr_m_subset)
-            i += 1
+                # faulty_idx = list(np.random.randint(0,len(navdata),size=int(0.5*len(navdata))))
+                rand_index_order = np.arange(len(navdata))
+                np.random.shuffle(rand_index_order)
 
-        full_data["fault_gt"] = fault_gt
-        full_data["corr_pr_m"] = corr_pr_m
-        full_data["raw_pr_m"] = raw_pr_m
+                num_faults_added = max(0,min(NUM_FAULTS,len(navdata)-5))
+                faulty_idxs = list(rand_index_order)[:num_faults_added]
+                # print("\n\n\nfault:",faulty_idxs,navdata["gnss_sv_id",faulty_idxs])
 
-        # thresholds = np.logspace(8,10,20)
-        thresholds = np.linspace(0.5,0.7,21)
-        # thresholds = np.linspace(0.,1.,20)
-        # [1E8,1E9,1E10]
-        for threshold in thresholds:
-            print("threshold:",threshold)
-            metrics = glp.evaluate_fde(full_data,method="edm",
-                                       threshold=threshold,
-                                       # max_faults=10,
-                                       verbose=False,
-                                       debug=True)
+                # print("before",navdata["corr_pr_m"][faulty_idxs] )
+                navdata["corr_pr_m",faulty_idxs] += bias_value
+                navdata["raw_pr_m",faulty_idxs] += bias_value
+                corr_pr_m_subset = navdata["corr_pr_m"]
+                raw_pr_m_subset = navdata["raw_pr_m"]
+                # print("after",navdata["corr_pr_m"][faulty_idxs])
 
-            metrics_navdata = glp.NavData()
-            metrics_navdata["location_name"] = np.array([location_name])
-            # metrics_navdata["location_name"] = location_name
-            metrics_navdata["bias"] = bias_value
-            metrics_navdata["threshold"] = threshold
-            for k,v in metrics.items():
-                metrics_navdata[k] = np.array([v])
+                fault_gt_subset = np.array([0] * len(navdata))
+                if bias_value != 0.:
+                    fault_gt_subset[faulty_idxs] = 1
+                # print(fault_gt_subset)
+                fault_gt += list(fault_gt_subset)
+                corr_pr_m += list(corr_pr_m_subset)
+                raw_pr_m += list(raw_pr_m_subset)
+                i += 1
 
-            results.concat(metrics_navdata,inplace=True)
-            # print(metrics_navdata)
+            full_data["fault_gt"] = fault_gt
+            full_data["corr_pr_m"] = corr_pr_m
+            full_data["raw_pr_m"] = raw_pr_m
 
-    results.to_csv(prefix="metrics_"+str(len(results)))
+            # thresholds = np.logspace(8,10,20)
+            thresholds = np.linspace(0.5,0.65,16)
+            # thresholds = np.linspace(0.,1.,20)
+            # [1E8,1E9,1E10]
+            for threshold in thresholds:
+                print("threshold:",threshold)
+                metrics, navdata = glp.evaluate_fde(full_data,method="edm",
+                                                    threshold=threshold,
+                                                    # max_faults=10,
+                                                    verbose=False,
+                                                    debug=True)
 
-# plt.figure()
+                metrics_navdata = glp.NavData()
+                metrics_navdata["location_name"] = np.array([location_name])
+                metrics_navdata["bias"] = bias_value
+                metrics_navdata["threshold"] = threshold
+                metrics_navdata["faults"] = NUM_FAULTS
+                for k,v in metrics.items():
+                    metrics_navdata[k] = np.array([v])
 
-print(np.max(results["balanced_accuracy"]))
-glp.plot_metric(results,"threshold","balanced_accuracy",
-                groupby="location_name",save=True)
-# plt.xscale("log")
-glp.plot_metric(results,"threshold","far",
-                groupby="location_name",save=True)
-# plt.xscale("log")
-glp.plot_metric(results,"threshold","mdr",
-                groupby="location_name",save=True)
-# plt.xscale("log")
+                navdata_prefix = [location_name,str(NUM_FAULTS),
+                                  str(bias_value),str(np.round(threshold,4)).zfill(4)]
+                navdata_prefix = "_".join(navdata_prefix).replace(".","")
+                navdata.to_csv(prefix=navdata_prefix)
 
-plt.show()
+                results.concat(metrics_navdata,inplace=True)
+                # print(metrics_navdata)
+
+        results.to_csv(prefix="metrics_"+str(len(results)))
+
+    # plt.figure()
+
+    # print(np.max(results["balanced_accuracy"]))
+    # glp.plot_metric(results,"threshold","balanced_accuracy",
+    #                 groupby="location_name",save=True)
+    # # plt.xscale("log")
+    # glp.plot_metric(results,"threshold","far",
+    #                 groupby="location_name",save=True)
+    # # plt.xscale("log")
+    # glp.plot_metric(results,"threshold","mdr",
+    #                 groupby="location_name",save=True)
+    # plt.xscale("log")
+
+    plt.show()
