@@ -12,8 +12,9 @@ import matplotlib.pyplot as plt
 # metrics_path = "/home/derek/improved-edm-fde/results/20230816195428_2000_test/metrics_945_navdata.csv"
 # metrics_path = "/home/derek/improved-edm-fde/results/20230817005344_calgary/metrics_189_navdata.csv"
 # metrics_path = "/home/derek/improved-edm-fde/results/20230817022058_residual/residual_336_navdata.csv"
-metrics_path = "/home/derek/improved-edm-fde/results/20230817022759/residual_144_navdata.csv"
-
+# metrics_path = "/home/derek/improved-edm-fde/results/20230817022759/residual_144_navdata.csv"
+# metrics_path = "/home/derek/improved-edm-fde/results/20230816_combined/metrics_144_navdata_calgary.csv"
+metrics_path = "/home/derek/improved-edm-fde/results/20230816_combined/residual_432_navdata_1.csv"
 
 navdata = glp.NavData(csv_path=metrics_path)
 
@@ -37,11 +38,11 @@ for bias in np.unique(navdata["bias"]):
                     # linewidth=5.0,
                     )
     plt.ylim(0.4,1.0)
-
+#
 # methods = ["fault_edm","all","fault_gt"]
 # linestyles = ["solid","dotted","dashdot"]
-#
-#
+
+
 # fig_mean = None
 # for mmm, method in enumerate(methods):
 #     fig_mean = glp.plot_metric(navdata.where("threshold",0.57),
@@ -62,9 +63,8 @@ for bias in np.unique(navdata["bias"]):
 #                                )
 # fig_std = None
 # for mmm, method in enumerate(methods):
-#     fig_std = glp.plot_metric(navdata.where("bias",60),
-#                                "threshold",method+"_pos_error_mean",
-#                                groupby="faults",
+#     fig_std = glp.plot_metric(navdata.where("bias",60).where("threshold",0.56,"geq").where("threshold",0.58,"leq"),
+#                                "faults",method+"_pos_error_mean",
 #                                save=True,
 #                                fig = fig_std,
 #                                linestyle=linestyles[mmm]
@@ -91,19 +91,19 @@ for bias in np.unique(navdata["bias"]):
                 # save=True)
 
 
-glp.plot_metric(navdata.where("bias",bias),
-                "threshold","mdr",
-                groupby="location_name",
-                title="MD Bias of " + str(bias) + "m",
-                save=True)
-plt.ylim(0.0,1.0)
-
-glp.plot_metric(navdata.where("bias",bias),
-                "threshold","far",
-                groupby="location_name",
-                title="FA Bias of " + str(bias) + "m",
-                save=True)
-plt.ylim(0.0,1.0)
+# glp.plot_metric(navdata.where("bias",bias),
+#                 "threshold","mdr",
+#                 groupby="location_name",
+#                 title="MD Bias of " + str(bias) + "m",
+#                 save=True)
+# plt.ylim(0.0,1.0)
+#
+# glp.plot_metric(navdata.where("bias",bias),
+#                 "threshold","far",
+#                 groupby="location_name",
+#                 title="FA Bias of " + str(bias) + "m",
+#                 save=True)
+# plt.ylim(0.0,1.0)
 
 # glp.plot_metric(navdata,
 #                 "threshold","timestep_min",
@@ -118,12 +118,12 @@ glp.plot_metric(navdata,
                 title="timestep_mean",
                 avg_y = True,
                 save=True)
-
-glp.plot_metric(navdata,
-                "threshold","timestep_median_ms",
-                groupby="location_name",
-                avg_y = True,
-                save=True)
+#
+# glp.plot_metric(navdata,
+#                 "threshold","timestep_median_ms",
+#                 groupby="location_name",
+#                 avg_y = True,
+#                 save=True)
 
 # glp.plot_metric(navdata,
 #                 "measurement_counts_mean",
