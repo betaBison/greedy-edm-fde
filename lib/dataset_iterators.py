@@ -236,6 +236,7 @@ class SmartLocIterator():
 
         data["gps_millis_original"] = data["gps_millis"]
 
+        print("adding biases")
         for i in range(1):
             print("loop:",i)
 
