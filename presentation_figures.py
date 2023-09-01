@@ -50,7 +50,54 @@ def main():
     # accuracy_plots()
 
     # timing plots
-    timing_plots()
+    # timing_plots()
+
+    # roc curve
+    roc_curve()
+
+def roc_curve():
+    metrics_dir = "/home/derek/improved-edm-fde/results/20230816_combined/"
+
+    edm_navdata = glp.NavData()
+    r_navdata = glp.NavData()
+    for file in os.listdir(metrics_dir):
+        file_path = os.path.join(metrics_dir,file)
+        location_data = glp.NavData(csv_path=file_path)
+        if "metrics_144" in file:
+            edm_navdata.concat(location_data,inplace=True)
+            print(len(edm_navdata))
+        elif "residual_432" in file:
+            r_navdata.concat(location_data,inplace=True)
+
+    edm_navdata["method_and_bias_m"] = np.array(["edm_"+str(b)+"_m" for b in edm_navdata["bias"]])
+
+    fig = glp.plot_metric(edm_navdata.where("faults",4).where("location_name","hong_kong"),
+                    "far","tpr",
+                    groupby="method_and_bias_m",
+                    save=False,
+                    # avg_y=True,
+                    linewidth=5.0,
+                    markersize=10
+                    )
+    plt.xlim(0.0,1.0)
+    plt.ylim(0.0,1.0)
+
+    r_navdata["method_and_bias_m"] = np.array(["residual_"+str(b)+"_m" for b in r_navdata["bias"]])
+    glp.plot_metric(r_navdata.where("faults",4).where("location_name","hong_kong"),
+                    "far","tpr",
+                    groupby="method_and_bias_m",
+                    save=True,
+                    prefix="faults_vs_ba",
+                    linewidth=5.0,
+                    markersize=10,
+                    linestyle="dotted",
+                    fig=fig,
+                    )
+    plt.xlim(0.0,1.0)
+    plt.ylim(0.0,1.0)
+
+    plt.show()
+
 
 def timing_plots():
     file_path = "/home/derek/improved-edm-fde/results/20230816_combined/edm_residual_24_navdata.csv"
