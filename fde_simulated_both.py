@@ -10,8 +10,18 @@ import os
 import numpy as np
 import gnss_lib_py as glp
 import matplotlib.pyplot as plt
+from datetime import datetime, timezone
+
 
 np.random.seed(314)
+
+start_datetime = datetime(2023,3,14,0,tzinfo=timezone.utc)
+# end_datetime = datetime(2023,3,14,23,59,59,999999,tzinfo=timezone.utc)
+end_datetime = datetime(2023,3,15,0,tzinfo=timezone.utc)
+start_gps_millis = int(glp.datetime_to_gps_millis(start_datetime))
+end_gps_millis = int(glp.datetime_to_gps_millis(end_datetime))
+
+methods = ["residual","edm"]
 
 locations = {
               "calgary" : (51.11056458625996, -114.1179704693596, 0.),
@@ -33,23 +43,31 @@ for location_name, location_tuple in locations.items():
                             "simulated",location_name + "_20230314.csv")
 
     print(csv_path)
+
     full_data_original = glp.NavData(csv_path=csv_path)
-    num_faults = [4,8,12]
+    if location_name in ("calgary","zurich","london"):
+        full_data_original = full_data_original.where("el_sv_deg",30.,"geq")
+
+    num_faults = [1,2,4,8,12]
     # num_faults = [4]
 
     for NUM_FAULTS in num_faults:
         print("faults:",NUM_FAULTS)
 
-        bias_values = [60]
-        # bias_values = [20,40,60]
+        # bias_values = [60]
+        bias_values = [60,40,20,10]
         # bias_values = [100]
 
         for bias_value in bias_values:
             print("bias:",bias_value)
 
             # full_data = full_data_original.copy(cols=list(np.arange(182)))
-            full_data = full_data_original.copy(cols=list(np.arange(2000)))
+            # full_data = full_data_original.copy(cols=list(np.arange(2000)))
+            # print(list(np.linspace(0,len(full_data_original)+1,288)))
+            # full_data = full_data_original.copy(cols=list(np.linspace(0,len(full_data_original),288)))
             # full_data = full_data_original.copy()
+            full_data = full_data_original.where("gps_millis",np.linspace(start_gps_millis,end_gps_millis,289))
+            print(len(full_data),len(full_data_original))
 
 
             i = 0
@@ -92,12 +110,14 @@ for location_name, location_tuple in locations.items():
 
             # thresholds = np.logspace(8,10,20)
             # thresholds = np.linspace(10,40,21)
-            # thresholds = np.linspace(0.,1.,20)
+            # thresholds = np.linspace(0.,10000,11)
             # [1E8,1E9,1E10]
-            thresholds = [17]
+            thresholds = [0.,50,250,500.,1000,2000,3000,4000,5000,10000,100000]
+            # thresholds = [5000]
             for threshold in thresholds:
                 print("threshold:",threshold)
-                metrics, navdata = glp.evaluate_fde(full_data,method="residual",
+                input_navdata = full_data.copy()
+                metrics, navdata = glp.evaluate_fde(input_navdata,method="residual",
                                                     threshold=threshold,
                                                     # max_faults=10,
                                                     verbose=False,
@@ -111,7 +131,7 @@ for location_name, location_tuple in locations.items():
                 for k,v in metrics.items():
                     metrics_navdata[k] = np.array([v])
 
-                navdata_prefix = [location_name,str(NUM_FAULTS),
+                navdata_prefix = ["residual",location_name,str(NUM_FAULTS),
                                   str(bias_value),str(np.round(threshold,4)).zfill(4)]
                 navdata_prefix = "_".join(navdata_prefix).replace(".","")
                 navdata.to_csv(prefix=navdata_prefix)
@@ -122,10 +142,12 @@ for location_name, location_tuple in locations.items():
             # thresholds = np.linspace(0.5,0.65,16)
             # thresholds = np.linspace(0.,1.,20)
             # [1E8,1E9,1E10]
-            thresholds = [0.57]
+            # thresholds = [0.57]
+            thresholds = [0.0,0.5,0.54,0.56,0.566,0.568,0.57,0.572,0.574,0.58,0.6]
             for threshold in thresholds:
                 print("threshold:",threshold)
-                metrics, navdata = glp.evaluate_fde(full_data,method="edm",
+                input_navdata = full_data.copy()
+                metrics, navdata = glp.evaluate_fde(input_navdata,method="edm",
                                                     threshold=threshold,
                                                     # max_faults=10,
                                                     verbose=False,
@@ -139,7 +161,7 @@ for location_name, location_tuple in locations.items():
                 for k,v in metrics.items():
                     metrics_navdata[k] = np.array([v])
 
-                navdata_prefix = [location_name,str(NUM_FAULTS),
+                navdata_prefix = ["edm",location_name,str(NUM_FAULTS),
                                   str(bias_value),str(np.round(threshold,4)).zfill(4)]
                 navdata_prefix = "_".join(navdata_prefix).replace(".","")
                 navdata.to_csv(prefix=navdata_prefix)

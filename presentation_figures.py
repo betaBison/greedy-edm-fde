@@ -9,11 +9,11 @@ import os
 from datetime import datetime, timezone
 
 import numpy as np
+from sklearn import metrics
 import matplotlib.pyplot as plt
 import gnss_lib_py as glp
 from gnss_lib_py.algorithms.fde import _edm_from_satellites_ranges
 from gnss_lib_py.utils.visualizations import _save_figure
-
 np.random.seed(314)
 
 locations = {
@@ -56,22 +56,13 @@ def main():
     roc_curve()
 
 def roc_curve():
-    metrics_dir = "/home/derek/improved-edm-fde/results/20230816_combined/"
+    metrics_dir = "/home/derek/improved-edm-fde/results/20230904232029/"
+    metrics_path = os.path.join(metrics_dir,"edm_residual_88_navdata.csv")
 
-    edm_navdata = glp.NavData()
-    r_navdata = glp.NavData()
-    for file in os.listdir(metrics_dir):
-        file_path = os.path.join(metrics_dir,file)
-        location_data = glp.NavData(csv_path=file_path)
-        if "metrics_144" in file:
-            edm_navdata.concat(location_data,inplace=True)
-            print(len(edm_navdata))
-        elif "residual_432" in file:
-            r_navdata.concat(location_data,inplace=True)
+    navdata = glp.NavData(csv_path = metrics_path)
+    navdata["method_and_bias_m"] = np.char.add(np.char.add(navdata["method"].astype(str),"_"),navdata["bias"].astype(str))
 
-    edm_navdata["method_and_bias_m"] = np.array(["edm_"+str(b)+"_m" for b in edm_navdata["bias"]])
-
-    fig = glp.plot_metric(edm_navdata.where("faults",4).where("location_name","hong_kong"),
+    fig = glp.plot_metric(navdata.where("method","edm"),
                     "far","tpr",
                     groupby="method_and_bias_m",
                     save=False,
@@ -82,8 +73,8 @@ def roc_curve():
     plt.xlim(0.0,1.0)
     plt.ylim(0.0,1.0)
 
-    r_navdata["method_and_bias_m"] = np.array(["residual_"+str(b)+"_m" for b in r_navdata["bias"]])
-    glp.plot_metric(r_navdata.where("faults",4).where("location_name","hong_kong"),
+    plt.gca().set_prop_cycle(None)
+    glp.plot_metric(navdata.where("method","residual"),
                     "far","tpr",
                     groupby="method_and_bias_m",
                     save=True,
@@ -95,6 +86,43 @@ def roc_curve():
                     )
     plt.xlim(0.0,1.0)
     plt.ylim(0.0,1.0)
+
+    # navdata["threshold"] *= 1000
+    glp.plot_metric(navdata.where("method","residual").where("bias",20),
+                    "far","tpr",
+                    groupby="threshold",
+                    save=True,
+                    prefix="faults_vs_ba",
+                    linewidth=5.0,
+                    markersize=10,
+                    )
+
+    for method_bias in np.unique(navdata["method_and_bias_m"]):
+        print(method_bias)
+        navdata_method_bias = navdata.where("method_and_bias_m",method_bias)
+
+        far = navdata_method_bias["far"]
+        tpr = navdata_method_bias["tpr"]
+        far_sort = np.argsort(far)
+        far = far[far_sort]
+        tpr = tpr[far_sort]
+        # print(navdata_method_bias["far"])
+        # print(navdata_method_bias["tpr"])
+        interp_point = np.interp(0.7,far,tpr)
+
+        # plt.figure()
+        # plt.plot(far,tpr,label="before")
+        # plt.plot(0.5,interp_point,label="interp")
+        tpr = tpr[far<0.5].tolist() + [interp_point]
+        far = far[far<0.5].tolist() + [0.5]
+        # plt.plot(far,tpr,label="after")
+
+        # plt.legend()
+        # plt.show()
+
+        print(metrics.auc(far,tpr))
+        # print(metrics.auc(navdata_method_bias["far"], navdata_method_bias["tpr"]))
+
 
     plt.show()
 
