@@ -112,7 +112,7 @@ for location_name, location_tuple in locations.items():
             # thresholds = np.linspace(10,40,21)
             # thresholds = np.linspace(0.,10000,11)
             # [1E8,1E9,1E10]
-            thresholds = [0.,50,250,500.,1000,2000,3000,4000,5000,10000,100000]
+            thresholds = [0,50,250,500,1000,2000,3000,4000,5000,10000,100000]
             # thresholds = [5000]
             for threshold in thresholds:
                 print("threshold:",threshold)

@@ -10,6 +10,8 @@ import gnss_lib_py as glp
 import matplotlib.pyplot as plt
 from datetime import datetime, timezone
 
+np.random.seed(314)
+
 start_datetime = datetime(2023,3,14,0,tzinfo=timezone.utc)
 # end_datetime = datetime(2023,3,14,23,59,59,999999,tzinfo=timezone.utc)
 end_datetime = datetime(2023,3,15,0,tzinfo=timezone.utc)
@@ -18,27 +20,6 @@ end_gps_millis = int(glp.datetime_to_gps_millis(end_datetime))
 
 print(start_gps_millis)
 print(end_gps_millis)
-
-# sp3_paths = glp.load_ephemeris("sp3",
-#                                gps_millis = [start_gps_millis,end_gps_millis],
-#                                verbose=True)
-# sp3 = glp.Sp3(sp3_paths)
-#
-# clk_paths = glp.load_ephemeris("clk",
-#                                gps_millis = [start_gps_millis,end_gps_millis],
-#                                verbose=True)
-# clk = glp.Clk(clk_paths)
-#
-# sp3_gnss_ids = set(np.unique(sp3["gnss_sv_id"]))
-# clk_gnss_ids = set(np.unique(clk["gnss_sv_id"]))
-#
-# print("diffs")
-# print(sp3_gnss_ids - clk_gnss_ids)
-# print(clk_gnss_ids - sp3_gnss_ids)
-# print(len(sp3_gnss_ids))
-# print(sorted(sp3_gnss_ids))
-
-
 
 locations = {
               "stanford_oval" : (37.42984154652992, -122.16946303566934, 0.),
@@ -85,18 +66,10 @@ for location_name, location_tuple in locations.items():
     navdata_without_time = navdata.copy()
 
     navdata_full = glp.NavData()
-    # for random_time in np.linspace(start_gps_millis,end_gps_millis,49):
     print("concatenating times")
-    for random_time in np.linspace(start_gps_millis,end_gps_millis,int(24*60)+1):
+    for timestep in np.linspace(start_gps_millis,end_gps_millis,int(24*12)+1):
 
-        # random_time = np.random.randint(start_gps_millis,end_gps_millis)
-        # random_time = np.random.randint(start_gps_millis,end_gps_millis)
-        # random_time = 1362865253267
-        # print("random")
-        # print(random_time)
-        # print(glp.gps_millis_to_datetime(random_time))
-
-        navdata_without_time["gps_millis"] = random_time
+        navdata_without_time["gps_millis"] = timestep
 
         navdata_full = navdata_full.concat(navdata_without_time.copy(),axis=1)
 
@@ -106,7 +79,10 @@ for location_name, location_tuple in locations.items():
                                      verbose=True)
     print("adding el az")
     glp.add_el_az(navdata,navdata,inplace=True)
-    navdata = navdata.where("el_sv_deg",10,"geq")
+    if location_name in ("calgary","zurich","london"):
+        navdata = navdata.where("el_sv_deg",30,"geq")
+    else:
+        navdata = navdata.where("el_sv_deg",10,"geq")
 
     true_pr_m = np.linalg.norm(navdata[["x_rx_m","y_rx_m","z_rx_m"]] -
                                  navdata[["x_sv_m","y_sv_m","z_sv_m"]],axis=0)
@@ -115,7 +91,7 @@ for location_name, location_tuple in locations.items():
     navdata["raw_pr_m"] = navdata["corr_pr_m"] - navdata["b_sv_m"]
 
     print("saving csv")
-    navdata.to_csv("data/simulated/" + location_name + "_20230314.csv")
+    navdata.to_csv("data/simulated_v2/" + location_name + "_20230314.csv")
 
     num_sats = []
     for timestamp, _, navdata_subset in navdata.loop_time("gps_millis"):
