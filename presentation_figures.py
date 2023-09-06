@@ -33,32 +33,30 @@ def main():
 
     # timing plots
     # timing_plots_calculations()
-    timing_plots()
+    # timing_plots()
 
     # without measurement noise
-    # moving_eigenvalues(noise=False)
+    moving_eigenvalues(noise=False)
 
     # with measurement noise
-    # moving_eigenvalues(noise=True)
+    moving_eigenvalues(noise=True)
 
     # singular value U matrix
     # moving_svd(noise=False)
 
     # skyplots from simulated data
     # world_skyplots_check()
-    world_skyplots()
-    sats_in_view()
+    # world_skyplots()
+    # sats_in_view()
 
     # simulated_data_metrics()
 
     #accuracy plots
     # accuracy_plots()
 
-
-
     # roc curve
-    roc_curve()
-    auc_table()
+    # roc_curve()
+    # auc_table()
 
 
 
@@ -165,7 +163,7 @@ def auc_table():
             auc = metrics.auc(far,tpr)
 
 
-            label_navdata[method + "_auc"] = np.round(auc,3)
+            label_navdata[method + "_auc"] = np.round(auc,2)
 
         navdata_auc = navdata_auc.concat(label_navdata)
         # print(metrics.auc(far,tpr))
@@ -556,17 +554,22 @@ def moving_eigenvalues(noise):
     svd_u, svd_s, svd_vt = np.linalg.svd(gram,full_matrices=True)
 
     data = glp.NavData()
-    data["singular_value"] = svd_s
+    data["eigenvalue_magnitude"] = svd_s
     data["number_of_faults"] = np.array(["0 faults"]*len(data))
 
     plt.rcParams['figure.figsize'] = [5.9, 3.5]
-    fig = glp.plot_metric(data,"singular_value",
+    fig = glp.plot_metric(data,"eigenvalue_magnitude",
                           groupby="number_of_faults",
                           linestyle="None", title="", markersize=8,)
     plt.xlim([-0.5,len(data)-0.5])
     plt.yscale("log")
     plt.ylim(1E-5,1E17)
-    _save_figure(fig,"0_faults")
+    if noise:
+        _save_figure(fig,"faults_with_noise_"+str(0).zfill(2))
+        _save_figure(fig,"faults_with_noise_"+str(19).zfill(2))
+    else:
+        _save_figure(fig,"faults_"+str(0).zfill(2))
+        _save_figure(fig,"faults_"+str(19).zfill(2))
 
 
     for i in range(1,10):
@@ -583,7 +586,7 @@ def moving_eigenvalues(noise):
         svd_u, svd_s, svd_vt = np.linalg.svd(gram,full_matrices=True)
 
         data_fault = glp.NavData()
-        data_fault["singular_value"] = svd_s
+        data_fault["eigenvalue_magnitude"] = svd_s
         if i == 1:
             data_fault["number_of_faults"] = np.array([str(i) + " fault"]*len(data_fault))
         else:
@@ -591,13 +594,18 @@ def moving_eigenvalues(noise):
 
         data.concat(data_fault,inplace=True)
         plt.rcParams['figure.figsize'] = [5.9, 3.5]
-        fig = glp.plot_metric(data,"singular_value",
+        fig = glp.plot_metric(data,"eigenvalue_magnitude",
                               groupby="number_of_faults",
                               linestyle="None", title="", markersize=8,)
         plt.xlim([-0.5,len(data_fault)-0.5])
         plt.yscale("log")
         plt.ylim(1E-5,1E17)
-        _save_figure(fig,str(i)+"_faults")
+        if noise:
+            _save_figure(fig,"faults_with_noise_"+str(i).zfill(2))
+            _save_figure(fig,"faults_with_noise_"+str(19-i).zfill(2))
+        else:
+            _save_figure(fig,"faults_"+str(i).zfill(2))
+            _save_figure(fig,"faults_"+str(19-i).zfill(2))
 
 
 def pre_tests():
