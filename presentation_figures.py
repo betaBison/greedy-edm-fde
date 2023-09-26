@@ -9,12 +9,12 @@ import os
 from datetime import datetime, timezone
 
 import numpy as np
-from sklearn import metrics
+from sklearn import metrics as sk
 import matplotlib.pyplot as plt
 import gnss_lib_py as glp
 from gnss_lib_py.algorithms.fde import _edm_from_satellites_ranges
 from gnss_lib_py.utils.visualizations import _save_figure
-from gnss_lib_py.utils.file_operations import TIMESTAMP
+
 np.random.seed(314)
 
 locations = {
@@ -32,14 +32,12 @@ locations = {
 def main():
 
     # update results directory and result file name here
-    # metrics_dir = os.path.join(os.getcwd(),"results","<results directory>")
-    # metrics_path = os.path.join(metrics_dir,"fde_<number>_navdata.csv")
-    metrics_dir = os.path.join(os.getcwd(),"results","20230925165202")
-    metrics_path = os.path.join(metrics_dir,"fde_144_navdata.csv")
+    results_dir = os.path.join(os.getcwd(),"results","<results directory>")
+    results_path = os.path.join(results_dir,"fde_<number>_navdata.csv")
 
     # timing plots
-    timing_plots_calculations(metrics_path)
-    timing_plots()
+    # timing_plots_calculations(results_path)
+    timing_plots(results_dir)
 
     # without measurement noise
     moving_eigenvalues(noise=False)
@@ -53,18 +51,33 @@ def main():
     # skyplots from simulated data
     world_skyplots_check()
     world_skyplots()
-    sats_in_view()
+    plot_sats_in_view()
 
     #accuracy plots
-    accuracy_plots()
+    accuracy_plots(results_path)
 
     # roc curve
-    roc_curve()
-    auc_table()
+    roc_curve(results_path)
+    auc_table(results_path)
 
     plt.show()
 
 def create_label(items):
+    """Custom label combinations for navdata.
+
+    Parameters
+    ----------
+    items : list
+        Items to combine.
+
+    Returns
+    -------
+    label : string
+        Label to use for combined data.
+
+    """
+
+
     if len(items) == 1:
         return items
     label = items[0]
@@ -74,11 +87,19 @@ def create_label(items):
 
     return label
 
-def roc_curve(metrics_path):
+def roc_curve(results_path):
+    """Plot the ROC curve.
 
+    Parameters
+    ----------
+    results_path : string
+        Paths to saved metrics.
 
-    navdata = glp.NavData(csv_path = metrics_path)
-    navdata["method_and_bias_m"] = np.char.add(np.char.add(navdata["method"].astype(str),"_"),navdata["bias"].astype(str))
+    """
+
+    navdata = glp.NavData(csv_path = results_path)
+    navdata["method_and_bias_m"] = np.char.add(np.char.add(navdata["method"].astype(str),"_"),
+                                                navdata["bias"].astype(str))
     navdata.rename({"far":"false_alarm_rate","tpr":"true_positive_rate"},inplace=True)
     navdata["glp_label"] = create_label([
                                          navdata["faults"].astype(str),
@@ -114,31 +135,32 @@ def roc_curve(metrics_path):
         plt.xlim(0.0,0.9)
         plt.ylim(0.0,1.0)
 
-def auc_table():
-    metrics_dir = "/home/derek/improved-edm-fde/results/20230905010421/"
-    metrics_path = os.path.join(metrics_dir,"edm_residual_3960_navdata.csv")
+def auc_table(results_path):
+    """Create the AUC table.
 
-    navdata = glp.NavData(csv_path = metrics_path)
-    navdata_cropped = navdata.where("bias",60).where("faults",8).concat(navdata.where("bias",20).where("faults",1))
+    Parameters
+    ----------
+    results_path : string
+        Paths to saved metrics.
 
-    # navdata["method_and_bias_m"] = np.char.add(np.char.add(navdata["method"].astype(str),"_"),navdata["bias"].astype(str))
-    # navdata["glp_label"] = np.char.add(np.char.add(navdata["method"].astype(str),"_"),navdata["bias"].astype(str))
+    """
+
+    navdata = glp.NavData(csv_path = results_path)
+    navdata_cropped = navdata.where("bias",60).where("faults",12).concat(navdata.where("bias",10).where("faults",1))
+
     navdata_cropped["glp_label"] = create_label([navdata_cropped["bias"].astype(str),
                                                  navdata_cropped["faults"].astype(str),
                                                  navdata_cropped["location_name"].astype(str),
-                                                 # navdata_cropped["method"].astype(str),
                                                  ])
     navdata_auc = glp.NavData()
     for glp_label in np.unique(navdata_cropped["glp_label"]):
         navdata_method_bias = navdata_cropped.where("glp_label",glp_label)
 
         label_navdata = glp.NavData()
-        # label_navdata["method"] = np.array([navdata_method_bias["method",0]])
         label_navdata["location_name"] = np.array([navdata_method_bias["location_name",0]])
         label_navdata["bias"] = np.array([navdata_method_bias["bias",0]])
         label_navdata["faults"] = np.array([navdata_method_bias["faults",0]])
 
-        # print(method_bias)
         for method in np.unique(navdata_cropped["method"]):
 
             far = navdata_method_bias.where("method",method)["far"]
@@ -146,28 +168,18 @@ def auc_table():
             far_sort = np.argsort(far)
             far = far[far_sort]
             tpr = tpr[far_sort]
-            # print(navdata_method_bias["far"])
-            # print(navdata_method_bias["tpr"])
             interp_value = 0.7
             interp_point = np.interp(0.7,far,tpr)
 
-            # plt.figure()
-            # plt.plot(far,tpr,label="before")
-            # plt.plot(interp_value,interp_point,label="interp")
             tpr = tpr[far<interp_value].tolist() + [interp_point]
             far = far[far<interp_value].tolist() + [interp_value]
-            # plt.plot(far,tpr,label="after")
-            #
-            # plt.legend()
-            # plt.show()
 
-            auc = metrics.auc(far,tpr)
+            auc = sk.auc(far,tpr)
 
 
             label_navdata[method + "_auc"] = np.round(auc,2)
 
         navdata_auc = navdata_auc.concat(label_navdata)
-        # print(metrics.auc(far,tpr))
 
     navdata_auc.to_csv(prefix="auc_latex",sep="&",lineterminator="\\\\\n")
     navdata_auc.to_csv(prefix="auc")
@@ -175,17 +187,17 @@ def auc_table():
     navdata_auc["edm_wins"] = navdata_auc["edm_auc"] > navdata_auc["residual_auc"]
     print(navdata_auc)
 
-def timing_plots_calculations(metrics_path):
-    """Timing plots.
+def timing_plots_calculations(results_path):
+    """Calculations for the timing plots.
 
     Parameters
     ----------
-    metrics_path : string
-        Paths to metrics.
+    results_path : string
+        Paths to saved metrics.
 
     """
 
-    navdata = glp.NavData(csv_path = metrics_path)
+    navdata = glp.NavData(csv_path = results_path)
     navdata["glp_label"] = create_label([navdata["faults"].astype(str),
                                          navdata["bias"].astype(str),
                                          navdata["location_name"].astype(str),
@@ -219,7 +231,7 @@ def timing_plots_calculations(metrics_path):
         file_prefix = [method,location_name,str(faults),str(bias),
                        threshold]
         file_name = "_".join(file_prefix).replace(".","") + "_navdata.csv"
-        file_path = os.path.join(os.path.dirname(metrics_path),file_name)
+        file_path = os.path.join(os.path.dirname(results_path),file_name)
         # print("fp:",file_path)
         navdata_file = glp.NavData(csv_path=file_path)
 
@@ -265,15 +277,23 @@ def timing_plots_calculations(metrics_path):
             single_navdata["std_compute_time_ms"] = np.std(v)
             measurements_navdata = measurements_navdata.concat(single_navdata)
 
-    measurements_navdata.to_csv(prefix="measurements_timing")
-    faults_navdata.to_csv(prefix="faults_timing")
+    measurements_navdata.to_csv(output_path=os.path.join(os.path.dirname(results_path),
+                                                         "measurements_timing.csv"))
+    faults_navdata.to_csv(output_path=os.path.join(os.path.dirname(results_path),
+                                                         "faults_timing.csv"))
 
-def timing_plots():
-    # metrics_dir = "/home/derek/improved-edm-fde/results/" + TIMESTAMP + "/"
-    metrics_dir = "/home/derek/improved-edm-fde/results/20230905180735/"
+def timing_plots(results_dir):
+    """Plot timing info.
 
-    faults_navdata = glp.NavData(csv_path=os.path.join(metrics_dir,"faults_timing_navdata.csv"))
-    measurements_navdata = glp.NavData(csv_path=os.path.join(metrics_dir,"measurements_timing_navdata.csv"))
+    Parameters
+    ----------
+    results_dir : string
+        Directory to saved metrics.
+
+    """
+
+    faults_navdata = glp.NavData(csv_path=os.path.join(results_dir,"faults_timing.csv"))
+    measurements_navdata = glp.NavData(csv_path=os.path.join(results_dir,"measurements_timing.csv"))
 
     faults_navdata.sort("faults",inplace=True)
     measurements_navdata.sort("measurements",inplace=True)
@@ -304,45 +324,25 @@ def timing_plots():
                              navdata_std["mean_compute_time_ms"] + 1*navdata_std["std_compute_time_ms"],
                              alpha=0.5)
         plt.yscale("log")
-        # if graph_type == "faults":
-        #     plt.ylim([1E-10,1E0])
         _save_figure(fig,graph_type+"_"+"mean_compute_time_ms")
 
-    # file_path = "/home/derek/improved-edm-fde/results/20230816_combined/edm_residual_24_navdata.csv"
-    #
-    # navdata = glp.NavData(csv_path=file_path)
-    #
-    # fig=glp.plot_metric(navdata,
-    #                 "faults","timestep_mean_ms",
-    #                 groupby="method",
-    #                 # title="BA Bias of " + str(bias) + "m",
-    #                 save=True,
-    #                 prefix="timing",
-    #                 avg_y=True,
-    #                 linewidth=5.0,
-    #                 markersize=10,
-    #                 )
-    # plt.yscale("log")
-    # _save_figure(fig,"timing")
+def accuracy_plots(results_path):
+    """Create accuracy plots.
 
-def accuracy_plots():
-    metrics_dir = "/home/derek/improved-edm-fde/results/20230816_combined/"
+    Parameters
+    ----------
+    results_path : string
+        Paths to saved metrics.
 
-    edm_navdata = glp.NavData()
-    r_navdata = glp.NavData()
-    for file in os.listdir(metrics_dir):
-        file_path = os.path.join(metrics_dir,file)
-        location_data = glp.NavData(csv_path=file_path)
-        if "metrics_144" in file:
-            edm_navdata.concat(location_data,inplace=True)
-            print(len(edm_navdata))
-        elif "residual_432" in file:
-            r_navdata.concat(location_data,inplace=True)
+    """
+
+    navdata = glp.NavData(csv_path = results_path)
+    edm_navdata = navdata.where("method","edm")
+    r_navdata = navdata.where("method","residual")
 
     glp.plot_metric(edm_navdata,
                     "threshold","balanced_accuracy",
                     groupby="bias",
-                    # title="BA Bias of " + str(bias) + "m",
                     save=True,
                     prefix="edm_bias",
                     avg_y=True,
@@ -354,7 +354,6 @@ def accuracy_plots():
     glp.plot_metric(edm_navdata.where("bias",60),
                     "threshold","balanced_accuracy",
                     groupby="faults",
-                    # title="BA Bias of " + str(bias) + "m",
                     save=True,
                     prefix="edm_faults",
                     avg_y=True,
@@ -366,7 +365,6 @@ def accuracy_plots():
     glp.plot_metric(r_navdata,
                     "threshold","balanced_accuracy",
                     groupby="bias",
-                    # title="BA Bias of " + str(bias) + "m",
                     save=True,
                     prefix="residual_bias",
                     avg_y=True,
@@ -402,14 +400,14 @@ def accuracy_plots():
 
 
 def simulated_data_metrics():
+    """Calculate metrics based on the simulated data.
 
+    """
     metrics = glp.NavData()
-
-    print()
 
     for location_name, i in locations.items():
         print("location name:",location_name)
-        csv_path = os.path.join("/home","derek","improved-edm-fde","data",
+        csv_path = os.path.join(os.getcwd(),"data",
                                 "simulated",location_name + "_20230314.csv")
 
         navdata = glp.NavData(csv_path=csv_path)
@@ -432,14 +430,16 @@ def simulated_data_metrics():
     print("mean:",np.mean(metrics["sats_in_view"]))
     print("max:",np.max(metrics["sats_in_view"]))
 
-def sats_in_view():
+def plot_sats_in_view():
+    """Calculate the satellites in view and plot.
 
+    """
     metrics = glp.NavData()
 
     for location_name, i in locations.items():
         print("location name:",location_name)
-        csv_path = os.path.join("/home","derek","improved-edm-fde","data",
-                                "simulated_v2",location_name + "_20230314.csv")
+        csv_path = os.path.join(os.getcwd(),"data",
+                                "simulated",location_name + "_20230314.csv")
 
         navdata = glp.NavData(csv_path=csv_path)
         if location_name in ("calgary","zurich","london"):
@@ -459,47 +459,44 @@ def sats_in_view():
         metrics.concat(metrics_subset,inplace=True)
 
     metrics["time_hr"] = (metrics["gps_millis"] - metrics["gps_millis",0])/(1000*60*60.)
-    # metrics.rename({"gps_millis":"gps_time_milliseconds"},inplace=True)
 
     start = glp.gps_millis_to_datetime(metrics["gps_millis",0])
     end = glp.gps_millis_to_datetime(metrics["gps_millis",-1])
 
-    print(metrics["gps_millis",0])
-    print(metrics["gps_millis",-1])
-    print(start,end,end-start)
-
-    # plt.rcParams['figure.figsize'] = [3.5, 3.5]
     fig = glp.plot_metric(metrics,"time_hr","sats_in_view",
-                          groupby="location_name",save=True)
+                          groupby="location_name")
     plt.xlim([0,24])
     _save_figure(fig,"sats_in_view")
 
 def world_skyplots():
+    """Plot the chosen world skkyplots.
 
+    """
     for location_name, i in locations.items():
         # only plot those used for presentation
         if location_name in ("sao_paulo","hong_kong","zurich"):
             print("location name:",location_name)
-            csv_path = os.path.join("/home","derek","improved-edm-fde","data",
+            csv_path = os.path.join(os.getcwd(),"data",
                                     "simulated",location_name + "_20230314.csv")
 
             navdata = glp.NavData(csv_path=csv_path)
-            if location_name in ("calgary","zurich","london"):
-                navdata = navdata.where("el_sv_deg",30.,"geq")
 
             timestamp_start = datetime(year=2023, month=3, day=14, hour=i, tzinfo=timezone.utc)
             timestamp_end = datetime(year=2023, month=3, day=14, hour=i+1, tzinfo=timezone.utc)
             gps_millis = glp.datetime_to_gps_millis(np.array([timestamp_start,timestamp_end]))
             cropped_navdata = navdata.where("gps_millis",gps_millis[0],"geq").where("gps_millis",gps_millis[1],"leq")
-            print(i,len(np.unique(cropped_navdata["gnss_id"])),len(np.unique(cropped_navdata["gnss_sv_id"])))
+            print(i,len(np.unique(cropped_navdata["gnss_id"])),
+                    len(np.unique(cropped_navdata["gnss_sv_id"])))
             glp.plot_skyplot(cropped_navdata,cropped_navdata,
                              prefix=location_name,save=True)
 
 def world_skyplots_check():
+    """Plot each of the location skyplots.
 
+    """
     for location_name, _ in locations.items():
         print("location name:",location_name)
-        csv_path = os.path.join("/home","derek","improved-edm-fde","data",
+        csv_path = os.path.join(os.getcwd(),"data",
                                 "simulated",location_name + "_20230314.csv")
 
         navdata = glp.NavData(csv_path=csv_path)
@@ -509,13 +506,23 @@ def world_skyplots_check():
             timestamp_end = datetime(year=2023, month=3, day=14, hour=i+1, tzinfo=timezone.utc)
             gps_millis = glp.datetime_to_gps_millis(np.array([timestamp_start,timestamp_end]))
             cropped_navdata = navdata.where("gps_millis",gps_millis[0],"geq").where("gps_millis",gps_millis[1],"leq")
-            print(i,len(np.unique(cropped_navdata["gnss_id"])),len(np.unique(cropped_navdata["gnss_sv_id"])))
+            print(i,len(np.unique(cropped_navdata["gnss_id"])),
+                    len(np.unique(cropped_navdata["gnss_sv_id"])))
 
 def moving_svd(noise):
-    file_path = "/home/derek/improved-edm-fde/data/simulated/stanford_oval_gt_20230314.csv"
+    """Plot the U matrix from singular value decomposition.
+
+    Parameters
+    ----------
+    noise : bool
+        If true, adds noise to the data.
+
+    """
+    file_path = os.path.join(os.getcwd(),"data","simulated",
+                             "stanford_oval_20230314.csv")
     navdata = glp.NavData(csv_path=file_path)
 
-    navdata = navdata.copy(cols=np.arange(9))
+    navdata = navdata.copy(cols=np.arange(4,13))
 
     if noise:
         navdata["corr_pr_m"] += np.random.normal(loc=0.0,scale=10,size=len(navdata))
@@ -528,7 +535,7 @@ def moving_svd(noise):
     gram = -0.5 * center @ edm @ center
 
     # calculate the singular value decomposition
-    svd_u, svd_s, svd_vt = np.linalg.svd(gram,full_matrices=True)
+    svd_u, _, _ = np.linalg.svd(gram,full_matrices=True)
 
     fig = plt.figure(figsize=(3.5,3.5))
     plt.imshow(np.abs(svd_u),cmap="cividis")
@@ -555,8 +562,19 @@ def moving_svd(noise):
     _save_figure(fig,"u_1_faults")
 
 def moving_eigenvalues(noise):
-    file_path = "/home/derek/improved-edm-fde/data/simulated/stanford_oval_gt_20230314.csv"
+    """Plot the singular values from singular value decomposition.
+
+    Parameters
+    ----------
+    noise : bool
+        If true, adds noise to the data.
+
+    """
+
+    file_path = os.path.join(os.getcwd(),"data","simulated",
+                             "stanford_oval_20230314.csv")
     navdata = glp.NavData(csv_path=file_path)
+    navdata = navdata.copy(cols=list(np.arange(20)))
 
     if noise:
         navdata["corr_pr_m"] += np.random.normal(loc=0.0,scale=10,size=len(navdata))
@@ -569,7 +587,7 @@ def moving_eigenvalues(noise):
     gram = -0.5 * center @ edm @ center
 
     # calculate the singular value decomposition
-    svd_u, svd_s, svd_vt = np.linalg.svd(gram,full_matrices=True)
+    _, svd_s, _ = np.linalg.svd(gram,full_matrices=True)
 
     data = glp.NavData()
     data["eigenvalue_magnitude"] = svd_s
@@ -624,163 +642,6 @@ def moving_eigenvalues(noise):
         else:
             _save_figure(fig,"faults_"+str(i).zfill(2))
             _save_figure(fig,"faults_"+str(19-i).zfill(2))
-
-
-def pre_tests():
-
-    # metrics_path = "/home/derek/improved-edm-fde/results/20230816195428_2000_test/metrics_945_navdata.csv"
-    # metrics_path = "/home/derek/improved-edm-fde/results/20230817005344_calgary/metrics_189_navdata.csv"
-    # metrics_path = "/home/derek/improved-edm-fde/results/20230817022058_residual/residual_336_navdata.csv"
-    # metrics_path = "/home/derek/improved-edm-fde/results/20230817022759/residual_144_navdata.csv"
-    # metrics_path = "/home/derek/improved-edm-fde/results/20230816_combined/metrics_144_navdata_calgary.csv"
-    metrics_path = "/home/derek/improved-edm-fde/results/20230816_combined/residual_432_navdata_1.csv"
-
-    navdata = glp.NavData(csv_path=metrics_path)
-
-    glp.plot_metric(navdata,
-                    "threshold","balanced_accuracy",
-                    groupby="bias",
-                    # title="BA Bias of " + str(bias) + "m",
-                    save=True,
-                    avg_y=True,
-                    # linewidth=5.0,
-                    )
-    plt.ylim(0.4,1.0)
-
-    for bias in np.unique(navdata["bias"]):
-        glp.plot_metric(navdata.where("bias",bias),
-                        "threshold","balanced_accuracy",
-                        groupby="faults",
-                        title="BA Bias of " + str(bias) + "m",
-                        save=True,
-                        # avg_y=True,
-                        # linewidth=5.0,
-                        )
-        plt.ylim(0.4,1.0)
-    #
-    # methods = ["fault_edm","all","fault_gt"]
-    # linestyles = ["solid","dotted","dashdot"]
-
-
-    # fig_mean = None
-    # for mmm, method in enumerate(methods):
-    #     fig_mean = glp.plot_metric(navdata.where("threshold",0.57),
-    #                                "faults",method+"_pos_error_mean",
-    #                                groupby="bias",
-    #                                save=True,
-    #                                fig = fig_mean,
-    #                                linestyle=linestyles[mmm]
-    #                                )
-    # fig_std = None
-    # for mmm, method in enumerate(methods):
-    #     fig_std = glp.plot_metric(navdata.where("threshold",0.57),
-    #                                "faults",method+"_pos_error_std",
-    #                                groupby="bias",
-    #                                save=True,
-    #                                fig = fig_std,
-    #                                linestyle=linestyles[mmm]
-    #                                )
-    # fig_std = None
-    # for mmm, method in enumerate(methods):
-    #     fig_std = glp.plot_metric(navdata.where("bias",60).where("threshold",0.56,"geq").where("threshold",0.58,"leq"),
-    #                                "faults",method+"_pos_error_mean",
-    #                                save=True,
-    #                                fig = fig_std,
-    #                                linestyle=linestyles[mmm]
-    #                                )
-
-    # fig_mean = glp.plot_metric(navdata.where("bias",60),
-    #                            "threshold","fault_edm_pos_error_std",
-    #                            groupby="faults",
-    #                            save=True,
-    #                            )
-
-    # glp.plot_metric(navdata,
-    #                 "faults","all_pos_error_std",
-    #                 groupby="bias",
-    #                 save=True,
-    #                 )
-
-
-    # glp.plot_metric(navdata,
-    #                 "threshold","timestep_max",
-    #                 groupby="location_name",
-    #                 title="timestep_max" ,
-    #                 avg_y = True,
-                    # save=True)
-
-
-    # glp.plot_metric(navdata.where("bias",bias),
-    #                 "threshold","mdr",
-    #                 groupby="location_name",
-    #                 title="MD Bias of " + str(bias) + "m",
-    #                 save=True)
-    # plt.ylim(0.0,1.0)
-    #
-    # glp.plot_metric(navdata.where("bias",bias),
-    #                 "threshold","far",
-    #                 groupby="location_name",
-    #                 title="FA Bias of " + str(bias) + "m",
-    #                 save=True)
-    # plt.ylim(0.0,1.0)
-
-    # glp.plot_metric(navdata,
-    #                 "threshold","timestep_min",
-    #                 groupby="location_name",
-    #                 title="timestep_min",
-    #                 avg_y = True,
-    #                 save=True)
-
-    glp.plot_metric(navdata,
-                    "threshold","timestep_mean_ms",
-                    groupby="location_name",
-                    title="timestep_mean",
-                    avg_y = True,
-                    save=True)
-    #
-    # glp.plot_metric(navdata,
-    #                 "threshold","timestep_median_ms",
-    #                 groupby="location_name",
-    #                 avg_y = True,
-    #                 save=True)
-
-    # glp.plot_metric(navdata,
-    #                 "measurement_counts_mean",
-    #                 groupby="location_name",
-    #                 title="measurement_counts_mean",
-    #                 # avg_y = True,
-    #                 save=True)
-    #
-    # glp.plot_metric(navdata,
-    #                 "measurement_counts_max",
-    #                 groupby="location_name",
-    #                 title="measurement_counts_max",
-    #                 # avg_y = True,
-    #                 save=True)
-    #
-    # glp.plot_metric(navdata,
-    #                 "measurement_counts_min",
-    #                 groupby="location_name",
-    #                 title="measurement_counts_min",
-    #                 # avg_y = True,
-    #                 save=True)
-
-    # glp.plot_metric(navdata,
-    #                 "measurement_counts_mean",
-    #                 "timestep_mean",
-    #                 groupby="location_name",
-    #                 title="measurement_counts_min",
-    #                 # avg_y = True,
-    #                 linestyle="None",
-    #                 save=True)
-
-    # glp.plot_metric(navdata,
-    #                 "threshold","timestep_max",
-    #                 groupby="location_name",
-    #                 title="timestep_max" ,
-    #                 avg_y = True,
-    #                 save=True)
-
 
 if __name__ == "__main__":
     main()

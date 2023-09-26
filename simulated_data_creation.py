@@ -5,6 +5,7 @@
 __authors__ = "D. Knowles"
 __date__ = "15 Aug 2023"
 
+import os
 from datetime import datetime, timezone
 
 import numpy as np
@@ -28,6 +29,9 @@ locations = {
               "sydney" : (-33.859749976799186, 151.22208557691505, 0.),
               "sao_paulo" : (-23.568026105263545, -46.736620380100675, 0.),
              }
+
+
+os.makedirs(os.path.join(os.getcwd(),"data","simulated"),exist_ok=True)
 
 for location_name, location_tuple in locations.items():
     print("location name:",location_name)

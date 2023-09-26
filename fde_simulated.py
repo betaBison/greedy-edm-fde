@@ -55,19 +55,15 @@ for csv_file in sorted(os.listdir(data_dir)):
 
                 num_faults_added = max(0,min(num_faults,len(navdata)-5))
                 faulty_idxs = list(rand_index_order)[:num_faults_added]
-                # print("\n\n\nfault:",faulty_idxs,navdata["gnss_sv_id",faulty_idxs])
 
-                # print("before",navdata["corr_pr_m"][faulty_idxs] )
                 navdata["corr_pr_m",faulty_idxs] += bias_value
                 navdata["raw_pr_m",faulty_idxs] += bias_value
                 corr_pr_m_subset = navdata["corr_pr_m"]
                 raw_pr_m_subset = navdata["raw_pr_m"]
-                # print("after",navdata["corr_pr_m"][faulty_idxs])
 
                 fault_gt_subset = np.array([0] * len(navdata))
                 if bias_value != 0.:
                     fault_gt_subset[faulty_idxs] = 1
-                # print(fault_gt_subset)
                 fault_gt += list(fault_gt_subset)
                 corr_pr_m += list(corr_pr_m_subset)
                 raw_pr_m += list(raw_pr_m_subset)
