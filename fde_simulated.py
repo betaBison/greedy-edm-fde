@@ -16,7 +16,7 @@ np.random.seed(314)
 
 # methods and thresholds to test
 METHODS = {
-            "edm" : [0.0,0.5,0.54,0.56,0.566,0.568,0.57,0.572,0.574,0.58,0.6],
+            "edm" : [0,0.5,0.54,0.56,0.566,0.568,0.57,0.572,0.574,0.58,0.6],
             "residual" : [0,50,250,500,1000,2000,3000,4000,5000,10000,100000],
            }
 NUM_FAULTS = [1,2,4,8,12]
@@ -24,20 +24,22 @@ BIAS_VALUES = [60,40,20,10]
 
 def main():
 
-
-
     data_dir = os.path.join(os.getcwd(),"data","simulated")
     processes = [Process(target=location_fde,
                          args=(os.path.join(data_dir,csv_file),)) \
                          for csv_file in sorted(os.listdir(data_dir))]
 
-    for process in processes:
-        process.start()
+    PROCESS_PARALLEL = 3
+    for ii in range(int(np.ceil(len(processes)/PROCESS_PARALLEL))):
+        process_group = processes[ii*PROCESS_PARALLEL:(ii+1)*PROCESS_PARALLEL]
 
-    for process in processes:
-        process.join()
+        for process in process_group:
+            process.start()
 
-    print('Done')
+        for process in process_group:
+            process.join()
+
+        print('Done')
 
     results = glp.NavData()
     results_dir = os.path.join(os.getcwd(),"results",TIMESTAMP)
@@ -126,6 +128,11 @@ def location_fde(csv_path):
                     metrics_navdata["faults"] = num_faults
                     for k,v in metrics.items():
                         metrics_navdata[k] = np.array([v])
+
+                    if threshold == 0:
+                        # str(np.round(0,4)).zfill(4) is '0000', but
+                        # str(np.round(0.0,4)).zfill(4) is '0.00', so
+                        threshold = int(0)
 
                     navdata_prefix = [method,location_name,str(num_faults),
                                       str(bias_value),str(np.round(threshold,4)).zfill(4)]

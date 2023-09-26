@@ -36,28 +36,35 @@ def main():
     results_path = os.path.join(results_dir,"fde_<number>_navdata.csv")
 
     # timing plots
-    # timing_plots_calculations(results_path)
+    print("timing plots")
+    timing_plots_calculations(results_path)
     timing_plots(results_dir)
 
+    print("eigenvalue plots")
     # without measurement noise
     moving_eigenvalues(noise=False)
-
     # with measurement noise
     moving_eigenvalues(noise=True)
 
     # singular value U matrix
+    print("singular value plot")
     moving_svd(noise=False)
 
     # skyplots from simulated data
-    world_skyplots_check()
+    # world_skyplots_check()
+    print("skykplots")
     world_skyplots()
+
+    print("satellites in view")
     plot_sats_in_view()
 
     #accuracy plots
-    accuracy_plots(results_path)
+    # accuracy_plots(results_path)
 
     # roc curve
+    print("roc curve")
     roc_curve(results_path)
+    print("auc table")
     auc_table(results_path)
 
     plt.show()
@@ -211,7 +218,7 @@ def timing_plots_calculations(results_path):
         timing_measurements[method] = {}
 
     for glp_label in np.unique(navdata["glp_label"]):
-        print("options:",glp_label)
+        print("calculating timing for:",glp_label)
         navdata_cropped = navdata.where("glp_label",glp_label)
         row_idx = np.argmax(navdata_cropped["balanced_accuracy"])
         method = navdata_cropped["method",row_idx].item()
@@ -219,20 +226,17 @@ def timing_plots_calculations(results_path):
         faults = navdata_cropped["faults",row_idx].item()
         bias = navdata_cropped["bias",row_idx].item()
         threshold = navdata_cropped["threshold",row_idx].item()
-        if threshold == 500.0:
-            threshold = 250.
-        # print("b",threshold)
-        if threshold < 1:
+        if threshold == 0:
+            threshold = str(int(threshold)).zfill(4)
+        elif threshold < 1:
             threshold = str(np.round(threshold,4)).zfill(4)
         else:
             threshold = str(int(threshold)).zfill(4)
-        # print("a",threshold)
 
         file_prefix = [method,location_name,str(faults),str(bias),
                        threshold]
         file_name = "_".join(file_prefix).replace(".","") + "_navdata.csv"
         file_path = os.path.join(os.path.dirname(results_path),file_name)
-        # print("fp:",file_path)
         navdata_file = glp.NavData(csv_path=file_path)
 
         for _, _, navdata_subset in navdata_file.loop_time("gps_millis"):
@@ -315,10 +319,7 @@ def timing_plots(results_dir):
 
         plt.gca().set_prop_cycle(None)
         for method in ["edm","residual"]:
-            print(method,graph_type)
             navdata_std = navdata_plot.where("method",method)
-            print("min:",navdata_std["mean_compute_time_ms"] - 1*navdata_std["std_compute_time_ms"])
-            print("max:",navdata_std["mean_compute_time_ms"] + 1*navdata_std["std_compute_time_ms"])
             plt.fill_between(navdata_std[graph_type],
                              navdata_std["mean_compute_time_ms"] - 1*navdata_std["std_compute_time_ms"],
                              navdata_std["mean_compute_time_ms"] + 1*navdata_std["std_compute_time_ms"],
@@ -406,7 +407,6 @@ def simulated_data_metrics():
     metrics = glp.NavData()
 
     for location_name, i in locations.items():
-        print("location name:",location_name)
         csv_path = os.path.join(os.getcwd(),"data",
                                 "simulated",location_name + "_20230314.csv")
 
@@ -426,9 +426,9 @@ def simulated_data_metrics():
         metrics.concat(metrics_subset,inplace=True)
 
     print("total_timesteps:",len(np.unique(metrics["gps_millis"])),len(metrics))
-    print("min:",np.min(metrics["sats_in_view"]))
-    print("mean:",np.mean(metrics["sats_in_view"]))
-    print("max:",np.max(metrics["sats_in_view"]))
+    print("min sats in view:",np.min(metrics["sats_in_view"]))
+    print("mean sats in view:",np.mean(metrics["sats_in_view"]))
+    print("max sats in view:",np.max(metrics["sats_in_view"]))
 
 def plot_sats_in_view():
     """Calculate the satellites in view and plot.
@@ -437,7 +437,6 @@ def plot_sats_in_view():
     metrics = glp.NavData()
 
     for location_name, i in locations.items():
-        print("location name:",location_name)
         csv_path = os.path.join(os.getcwd(),"data",
                                 "simulated",location_name + "_20230314.csv")
 
@@ -460,9 +459,6 @@ def plot_sats_in_view():
 
     metrics["time_hr"] = (metrics["gps_millis"] - metrics["gps_millis",0])/(1000*60*60.)
 
-    start = glp.gps_millis_to_datetime(metrics["gps_millis",0])
-    end = glp.gps_millis_to_datetime(metrics["gps_millis",-1])
-
     fig = glp.plot_metric(metrics,"time_hr","sats_in_view",
                           groupby="location_name")
     plt.xlim([0,24])
@@ -475,7 +471,6 @@ def world_skyplots():
     for location_name, i in locations.items():
         # only plot those used for presentation
         if location_name in ("sao_paulo","hong_kong","zurich"):
-            print("location name:",location_name)
             csv_path = os.path.join(os.getcwd(),"data",
                                     "simulated",location_name + "_20230314.csv")
 
@@ -485,8 +480,6 @@ def world_skyplots():
             timestamp_end = datetime(year=2023, month=3, day=14, hour=i+1, tzinfo=timezone.utc)
             gps_millis = glp.datetime_to_gps_millis(np.array([timestamp_start,timestamp_end]))
             cropped_navdata = navdata.where("gps_millis",gps_millis[0],"geq").where("gps_millis",gps_millis[1],"leq")
-            print(i,len(np.unique(cropped_navdata["gnss_id"])),
-                    len(np.unique(cropped_navdata["gnss_sv_id"])))
             glp.plot_skyplot(cropped_navdata,cropped_navdata,
                              prefix=location_name,save=True)
 
@@ -522,26 +515,10 @@ def moving_svd(noise):
                              "stanford_oval_20230314.csv")
     navdata = glp.NavData(csv_path=file_path)
 
-    navdata = navdata.copy(cols=np.arange(4,13))
+    navdata = navdata.copy(cols=np.arange(1,10))
 
     if noise:
         navdata["corr_pr_m"] += np.random.normal(loc=0.0,scale=10,size=len(navdata))
-
-    edm = _edm_from_satellites_ranges(navdata[["x_sv_m","y_sv_m","z_sv_m"]],
-                                      navdata["corr_pr_m"])
-
-    dims = edm.shape[1]
-    center = np.eye(dims) - (1./dims) * np.ones((dims,dims))
-    gram = -0.5 * center @ edm @ center
-
-    # calculate the singular value decomposition
-    svd_u, _, _ = np.linalg.svd(gram,full_matrices=True)
-
-    fig = plt.figure(figsize=(3.5,3.5))
-    plt.imshow(np.abs(svd_u),cmap="cividis")
-    plt.colorbar()
-    _save_figure(fig,"u_0_faults")
-
 
     navdata["corr_pr_m",3] += 1000.
     edm = _edm_from_satellites_ranges(navdata[["x_sv_m","y_sv_m","z_sv_m"]],
@@ -552,9 +529,7 @@ def moving_svd(noise):
     gram = -0.5 * center @ edm @ center
 
     # calculate the singular value decomposition
-    svd_u, svd_s, svd_vt = np.linalg.svd(gram,full_matrices=True)
-
-    print(list(np.argsort(np.mean(np.abs(svd_u)[:,3:5],axis=1))[::-1]))
+    svd_u, _, _ = np.linalg.svd(gram,full_matrices=True)
 
     fig = plt.figure(figsize=(3.5,3.5))
     plt.imshow(np.abs(svd_u),cmap="cividis")
