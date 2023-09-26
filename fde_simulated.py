@@ -23,7 +23,7 @@ BIAS_VALUES = [60,40,20,10]
 results = glp.NavData()
 
 data_dir = os.path.join(os.getcwd(),"data","simulated")
-for csv_file in os.listdir(data_dir):
+for csv_file in sorted(os.listdir(data_dir)):
 
     location_name = "_".join(csv_file.split("_")[:-1])
     print("location:",location_name)

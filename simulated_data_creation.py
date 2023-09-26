@@ -5,21 +5,17 @@
 __authors__ = "D. Knowles"
 __date__ = "15 Aug 2023"
 
+from datetime import datetime, timezone
+
 import numpy as np
 import gnss_lib_py as glp
-import matplotlib.pyplot as plt
-from datetime import datetime, timezone
 
 np.random.seed(314)
 
 start_datetime = datetime(2023,3,14,0,tzinfo=timezone.utc)
-# end_datetime = datetime(2023,3,14,23,59,59,999999,tzinfo=timezone.utc)
 end_datetime = datetime(2023,3,15,0,tzinfo=timezone.utc)
 start_gps_millis = int(glp.datetime_to_gps_millis(start_datetime))
 end_gps_millis = int(glp.datetime_to_gps_millis(end_datetime))
-
-print(start_gps_millis)
-print(end_gps_millis)
 
 locations = {
               "stanford_oval" : (37.42984154652992, -122.16946303566934, 0.),
@@ -60,9 +56,6 @@ for location_name, location_tuple in locations.items():
     navdata["z_rx_m"] = z_rx_m
     navdata["b_rx_m"] = 0.
 
-
-
-
     navdata_without_time = navdata.copy()
 
     navdata_full = glp.NavData()
@@ -72,7 +65,6 @@ for location_name, location_tuple in locations.items():
         navdata_without_time["gps_millis"] = timestep
 
         navdata_full = navdata_full.concat(navdata_without_time.copy(),axis=1)
-
 
     print("adding sv times")
     navdata = glp.add_sv_states(navdata_full, source="precise",
@@ -91,18 +83,4 @@ for location_name, location_tuple in locations.items():
     navdata["raw_pr_m"] = navdata["corr_pr_m"] - navdata["b_sv_m"]
 
     print("saving csv")
-    navdata.to_csv("data/simulated_v2/" + location_name + "_20230314.csv")
-
-    num_sats = []
-    for timestamp, _, navdata_subset in navdata.loop_time("gps_millis"):
-
-        # print(len(np.unique(navdata["gnss_sv_id"])))
-        num_sats.append(len(np.unique(navdata_subset["gnss_sv_id"])))
-        # print(np.unique(navdata["gnss_sv_id"]))
-        # glp.plot_skyplot(navdata_subset,navdata_subset,prefix=str(int(timestamp)),save=True)
-        # plt.show()
-        # glp.close_figures()
-
-    print(num_sats)
-    num_sats = np.array(num_sats)
-    print(np.min(num_sats),np.mean(num_sats),np.max(num_sats))
+    navdata.to_csv("data/simulated/" + location_name + "_20230314.csv")

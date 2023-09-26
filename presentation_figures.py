@@ -31,9 +31,15 @@ locations = {
 
 def main():
 
+    # update results directory and result file name here
+    # metrics_dir = os.path.join(os.getcwd(),"results","<results directory>")
+    # metrics_path = os.path.join(metrics_dir,"fde_<number>_navdata.csv")
+    metrics_dir = os.path.join(os.getcwd(),"results","20230925165202")
+    metrics_path = os.path.join(metrics_dir,"fde_144_navdata.csv")
+
     # timing plots
-    # timing_plots_calculations()
-    # timing_plots()
+    timing_plots_calculations(metrics_path)
+    timing_plots()
 
     # without measurement noise
     moving_eigenvalues(noise=False)
@@ -42,23 +48,19 @@ def main():
     moving_eigenvalues(noise=True)
 
     # singular value U matrix
-    # moving_svd(noise=False)
+    moving_svd(noise=False)
 
     # skyplots from simulated data
-    # world_skyplots_check()
-    # world_skyplots()
-    # sats_in_view()
-
-    # simulated_data_metrics()
+    world_skyplots_check()
+    world_skyplots()
+    sats_in_view()
 
     #accuracy plots
-    # accuracy_plots()
+    accuracy_plots()
 
     # roc curve
-    # roc_curve()
-    # auc_table()
-
-
+    roc_curve()
+    auc_table()
 
     plt.show()
 
@@ -72,9 +74,8 @@ def create_label(items):
 
     return label
 
-def roc_curve():
-    metrics_dir = "/home/derek/improved-edm-fde/results/20230905010421/"
-    metrics_path = os.path.join(metrics_dir,"edm_residual_3960_navdata.csv")
+def roc_curve(metrics_path):
+
 
     navdata = glp.NavData(csv_path = metrics_path)
     navdata["method_and_bias_m"] = np.char.add(np.char.add(navdata["method"].astype(str),"_"),navdata["bias"].astype(str))
@@ -174,9 +175,16 @@ def auc_table():
     navdata_auc["edm_wins"] = navdata_auc["edm_auc"] > navdata_auc["residual_auc"]
     print(navdata_auc)
 
-def timing_plots_calculations():
-    metrics_dir = "/home/derek/improved-edm-fde/results/20230905010421/"
-    metrics_path = os.path.join(metrics_dir,"edm_residual_3960_navdata.csv")
+def timing_plots_calculations(metrics_path):
+    """Timing plots.
+
+    Parameters
+    ----------
+    metrics_path : string
+        Paths to metrics.
+
+    """
+
     navdata = glp.NavData(csv_path = metrics_path)
     navdata["glp_label"] = create_label([navdata["faults"].astype(str),
                                          navdata["bias"].astype(str),
@@ -211,7 +219,7 @@ def timing_plots_calculations():
         file_prefix = [method,location_name,str(faults),str(bias),
                        threshold]
         file_name = "_".join(file_prefix).replace(".","") + "_navdata.csv"
-        file_path = os.path.join(metrics_dir,file_name)
+        file_path = os.path.join(os.path.dirname(metrics_path),file_name)
         # print("fp:",file_path)
         navdata_file = glp.NavData(csv_path=file_path)
 
@@ -431,7 +439,7 @@ def sats_in_view():
     for location_name, i in locations.items():
         print("location name:",location_name)
         csv_path = os.path.join("/home","derek","improved-edm-fde","data",
-                                "simulated",location_name + "_20230314.csv")
+                                "simulated_v2",location_name + "_20230314.csv")
 
         navdata = glp.NavData(csv_path=csv_path)
         if location_name in ("calgary","zurich","london"):
@@ -441,7 +449,7 @@ def sats_in_view():
 
         sats_in_view = []
         gps_millis = []
-        for timestamp,_,subset in navdata.loop_time("gps_millis",delta_t_decimals=-6):
+        for timestamp,_,subset in navdata.loop_time("gps_millis"):
             sats_in_view.append(len(np.unique(subset["gnss_sv_id"])))
             gps_millis.append(timestamp)
 
@@ -450,11 +458,21 @@ def sats_in_view():
         metrics_subset["location_name"] = np.array([location_name]*len(sats_in_view))
         metrics.concat(metrics_subset,inplace=True)
 
-    metrics.rename({"gps_millis":"gps_time_milliseconds"},inplace=True)
+    metrics["time_hr"] = (metrics["gps_millis"] - metrics["gps_millis",0])/(1000*60*60.)
+    # metrics.rename({"gps_millis":"gps_time_milliseconds"},inplace=True)
+
+    start = glp.gps_millis_to_datetime(metrics["gps_millis",0])
+    end = glp.gps_millis_to_datetime(metrics["gps_millis",-1])
+
+    print(metrics["gps_millis",0])
+    print(metrics["gps_millis",-1])
+    print(start,end,end-start)
 
     # plt.rcParams['figure.figsize'] = [3.5, 3.5]
-    glp.plot_metric(metrics,"gps_time_milliseconds","sats_in_view",
-                    groupby="location_name",save=True)
+    fig = glp.plot_metric(metrics,"time_hr","sats_in_view",
+                          groupby="location_name",save=True)
+    plt.xlim([0,24])
+    _save_figure(fig,"sats_in_view")
 
 def world_skyplots():
 
@@ -479,7 +497,7 @@ def world_skyplots():
 
 def world_skyplots_check():
 
-    for location_name, location_tuple in locations.items():
+    for location_name, _ in locations.items():
         print("location name:",location_name)
         csv_path = os.path.join("/home","derek","improved-edm-fde","data",
                                 "simulated",location_name + "_20230314.csv")
@@ -487,11 +505,11 @@ def world_skyplots_check():
         navdata = glp.NavData(csv_path=csv_path)
 
         for i in range(0,23):
-          timestamp_start = datetime(year=2023, month=3, day=14, hour=i, tzinfo=timezone.utc)
-          timestamp_end = datetime(year=2023, month=3, day=14, hour=i+1, tzinfo=timezone.utc)
-          gps_millis = glp.datetime_to_gps_millis(np.array([timestamp_start,timestamp_end]))
-          cropped_navdata = navdata.where("gps_millis",gps_millis[0],"geq").where("gps_millis",gps_millis[1],"leq")
-          print(i,len(np.unique(cropped_navdata["gnss_id"])),len(np.unique(cropped_navdata["gnss_sv_id"])))
+            timestamp_start = datetime(year=2023, month=3, day=14, hour=i, tzinfo=timezone.utc)
+            timestamp_end = datetime(year=2023, month=3, day=14, hour=i+1, tzinfo=timezone.utc)
+            gps_millis = glp.datetime_to_gps_millis(np.array([timestamp_start,timestamp_end]))
+            cropped_navdata = navdata.where("gps_millis",gps_millis[0],"geq").where("gps_millis",gps_millis[1],"leq")
+            print(i,len(np.unique(cropped_navdata["gnss_id"])),len(np.unique(cropped_navdata["gnss_sv_id"])))
 
 def moving_svd(noise):
     file_path = "/home/derek/improved-edm-fde/data/simulated/stanford_oval_gt_20230314.csv"
