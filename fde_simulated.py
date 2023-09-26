@@ -6,9 +6,11 @@ __authors__ = "D. Knowles"
 __date__ = "15 Aug 2023"
 
 import os
+from multiprocessing import Process
 
 import numpy as np
 import gnss_lib_py as glp
+from gnss_lib_py.utils.file_operations import TIMESTAMP
 
 np.random.seed(314)
 
@@ -20,22 +22,53 @@ METHODS = {
 NUM_FAULTS = [1,2,4,8,12]
 BIAS_VALUES = [60,40,20,10]
 
-results = glp.NavData()
+def main():
 
-data_dir = os.path.join(os.getcwd(),"data","simulated")
-for csv_file in sorted(os.listdir(data_dir)):
 
-    location_name = "_".join(csv_file.split("_")[:-1])
-    print("location:",location_name)
-    csv_path = os.path.join(data_dir,csv_file)
+
+    data_dir = os.path.join(os.getcwd(),"data","simulated")
+    processes = [Process(target=location_fde,
+                         args=(os.path.join(data_dir,csv_file),)) \
+                         for csv_file in sorted(os.listdir(data_dir))]
+
+    for process in processes:
+        process.start()
+
+    for process in processes:
+        process.join()
+
+    print('Done')
+
+    results = glp.NavData()
+    results_dir = os.path.join(os.getcwd(),"results",TIMESTAMP)
+    for navdata_file in sorted(os.listdir(results_dir)):
+        if navdata_file[:9] == "location_":
+            results = results.concat(glp.NavData(csv_path=os.path.join(results_dir,
+                                                         navdata_file)))
+
+    results.to_csv(prefix="fde_"+str(len(results)))
+
+def location_fde(csv_path):
+    """Compute FDE on new location.
+
+    Parameters
+    ----------
+    csv_file : path
+        Path to csv file.
+
+    """
+    results = glp.NavData()
+
     print(csv_path)
+    location_name = "_".join(os.path.basename(csv_path).split("_")[:-1])
+    print("location:",location_name)
     full_data_original = glp.NavData(csv_path=csv_path)
 
     for num_faults in NUM_FAULTS:
-        print("faults:",num_faults)
+        print(location_name,"faults:",num_faults)
 
         for bias_value in BIAS_VALUES:
-            print("bias:",bias_value)
+            print(location_name,"bias:",bias_value)
 
             full_data = full_data_original.copy()
 
@@ -75,9 +108,9 @@ for csv_file in sorted(os.listdir(data_dir)):
 
             # iterate over methods
             for method, thresholds in METHODS.items():
-                print("method:",method)
+                print(location_name,"method:",method)
                 for threshold in thresholds:
-                    print("threshold:",threshold)
+                    print(location_name,"threshold:",threshold)
 
                     input_navdata = full_data.copy()
                     metrics, navdata = glp.evaluate_fde(input_navdata,method=method,
@@ -101,4 +134,7 @@ for csv_file in sorted(os.listdir(data_dir)):
 
                     results.concat(metrics_navdata,inplace=True)
 
-        results.to_csv(prefix="fde_"+str(len(results)))
+        results.to_csv(prefix="location_"+location_name+"_"+str(len(results)))
+
+if __name__ == "__main__":
+    main()
