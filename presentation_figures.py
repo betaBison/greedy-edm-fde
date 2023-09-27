@@ -33,7 +33,7 @@ def main():
 
     # update results directory and result file name here
     results_dir = os.path.join(os.getcwd(),"results","<results directory>")
-    results_path = os.path.join(results_dir,"fde_<number>_navdata.csv")
+    results_path = os.path.join(results_dir,"fde_11880_navdata.csv")
 
     # timing plots
     print("timing plots")

@@ -20,8 +20,7 @@ python3 simulated_data_creation.py
 ```
 python3 fde_simulated.py
 ```
-3. Create presentation figures by editing the ``<results directory>`` and
-``<number>`` in ``presentation_figures.py`` then running the file.
+3. Create presentation figures by editing the ``<results directory>`` in ``presentation_figures.py`` then running the file.
 ```
 python3 presentation_figures.py
 ```
