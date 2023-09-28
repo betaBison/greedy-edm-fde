@@ -4,8 +4,15 @@ This repository contains code for Euclidean Distance Matrix-based Fault Detectio
 
 ## Install Dependencies
 
+Install all dependencies with ``pip install -r requirements.txt``  
+
+or  
+
 Install ``gnss_lib_py`` either with ``pip install gnss_lib_py`` or
-following the detailed [installation instructions](https://gnss-lib-py.readthedocs.io/en/latest/install.html).
+following the detailed [installation instructions](https://gnss-lib-py.readthedocs.io/en/latest/install.html). And install the other needed Python packages in
+the ``requirements.txt`` file.
+
+
 
 ## Run Instructions
 
@@ -20,7 +27,8 @@ python3 simulated_data_creation.py
 ```
 python3 fde_simulated.py
 ```
-3. Create presentation figures by editing the ``<results directory>`` in ``presentation_figures.py`` then running the file.
+3. Create presentation figures by editing the ``<results directory>`` and
+``<number>`` in ``presentation_figures.py`` then running the file.
 ```
 python3 presentation_figures.py
 ```

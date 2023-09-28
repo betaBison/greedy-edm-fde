@@ -1,0 +1,4 @@
+gnss_lib_py
+scikit-learn
+numpy
+matplotlib
