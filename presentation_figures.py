@@ -239,7 +239,7 @@ def timing_plots_calculations(results_path):
         file_path = os.path.join(os.path.dirname(results_path),file_name)
         navdata_file = glp.NavData(csv_path=file_path)
 
-        for _, _, navdata_subset in navdata_file.loop_time("gps_millis"):
+        for _, _, navdata_subset in glp.loop_time(navdata_file,"gps_millis"):
             compute_time_ms = navdata_subset["compute_time_s",0]*1000
             faults = np.sum(navdata_subset["fault_gt"])
             if faults not in [1,2,4,8,12]:
@@ -416,7 +416,7 @@ def simulated_data_metrics():
 
         sats_in_view = []
         gps_millis = []
-        for timestamp,_,subset in navdata.loop_time("gps_millis"):
+        for timestamp,_,subset in glp.loop_time(navdata,"gps_millis"):
             sats_in_view.append(len(np.unique(subset["gnss_sv_id"])))
             gps_millis.append(timestamp)
 
@@ -448,7 +448,7 @@ def plot_sats_in_view():
 
         sats_in_view = []
         gps_millis = []
-        for timestamp,_,subset in navdata.loop_time("gps_millis"):
+        for timestamp,_,subset in glp.loop_time(navdata,"gps_millis"):
             sats_in_view.append(len(np.unique(subset["gnss_sv_id"])))
             gps_millis.append(timestamp)
 

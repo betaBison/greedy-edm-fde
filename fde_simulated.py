@@ -16,18 +16,21 @@ np.random.seed(314)
 
 # methods and thresholds to test
 METHODS = {
-            "edm" : [0,0.5,0.54,0.56,0.566,0.568,0.57,0.572,0.574,0.58,0.6],
-            "residual" : [0,50,250,500,1000,2000,3000,4000,5000,10000,100000],
+            # "edm" : [0,0.5,0.54,0.56,0.566,0.568,0.57,0.572,0.574,0.58,0.6],
+            "ss" : [0.],
+            # "residual" : [0,50,250,500,1000,2000,3000,4000,5000,10000,100000],
            }
-NUM_FAULTS = [1,2,4,8,12]
-BIAS_VALUES = [60,40,20,10]
+NUM_FAULTS = [1]
+# NUM_FAULTS = [1,2,4,8,12]
+BIAS_VALUES = [60]
+# BIAS_VALUES = [60,40,20,10]
 
 def main():
 
     data_dir = os.path.join(os.getcwd(),"data","simulated")
     processes = [Process(target=location_fde,
                          args=(os.path.join(data_dir,csv_file),)) \
-                         for csv_file in sorted(os.listdir(data_dir))]
+                         for csv_file in [sorted(os.listdir(data_dir))[0]]]
 
     PROCESS_PARALLEL = 3
     for ii in range(int(np.ceil(len(processes)/PROCESS_PARALLEL))):
@@ -45,7 +48,7 @@ def main():
     results_dir = os.path.join(os.getcwd(),"results",TIMESTAMP)
     for navdata_file in sorted(os.listdir(results_dir)):
         if navdata_file[:9] == "location_":
-            results = results.concat(glp.NavData(csv_path=os.path.join(results_dir,
+            results = glp.concat(results,glp.NavData(csv_path=os.path.join(results_dir,
                                                          navdata_file)))
 
     results.to_csv(prefix="fde_"+str(len(results)))
@@ -65,6 +68,8 @@ def location_fde(csv_path):
     location_name = "_".join(os.path.basename(csv_path).split("_")[:-1])
     print("location:",location_name)
     full_data_original = glp.NavData(csv_path=csv_path)
+    ## TODO:
+    # full_data_original = full_data_original.where("gps_millis",np.unique(full_data_original["gps_millis"])[0])
 
     for num_faults in NUM_FAULTS:
         print(location_name,"faults:",num_faults)
@@ -78,7 +83,7 @@ def location_fde(csv_path):
             fault_gt = []
             corr_pr_m = []
             raw_pr_m = []
-            for timestamp, _, navdata in full_data.loop_time("gps_millis"):
+            for timestamp, _, navdata in glp.loop_time(full_data,"gps_millis"):
 
                 # navdata = navdata.copy(cols=list(np.arange(10)))
                 if i % 100 == 0:
@@ -117,8 +122,8 @@ def location_fde(csv_path):
                     input_navdata = full_data.copy()
                     metrics, navdata = glp.evaluate_fde(input_navdata,method=method,
                                                         threshold=threshold,
-                                                        # max_faults=10,
-                                                        verbose=False,
+                                                        max_faults=1,
+                                                        verbose=True,
                                                         time_fde=True)
 
                     metrics_navdata = glp.NavData()
@@ -139,7 +144,7 @@ def location_fde(csv_path):
                     navdata_prefix = "_".join(navdata_prefix).replace(".","")
                     navdata.to_csv(prefix=navdata_prefix)
 
-                    results.concat(metrics_navdata,inplace=True)
+                    results = glp.concat(results,metrics_navdata)
 
         results.to_csv(prefix="location_"+location_name+"_"+str(len(results)))
 
