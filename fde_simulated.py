@@ -17,7 +17,7 @@ np.random.seed(314)
 # methods and thresholds to test
 METHODS = {
             # "edm" : [0,0.5,0.54,0.56,0.566,0.568,0.57,0.572,0.574,0.58,0.6],
-            "ss" : [0.],
+            "ss" : [0.] #,5,10,20],
             # "residual" : [0,50,250,500,1000,2000,3000,4000,5000,10000,100000],
            }
 NUM_FAULTS = [1]
@@ -122,7 +122,7 @@ def location_fde(csv_path):
                     input_navdata = full_data.copy()
                     metrics, navdata = glp.evaluate_fde(input_navdata,method=method,
                                                         threshold=threshold,
-                                                        max_faults=1,
+                                                        max_faults=num_faults,
                                                         verbose=True,
                                                         time_fde=True)
 
@@ -147,6 +147,9 @@ def location_fde(csv_path):
                     results = glp.concat(results,metrics_navdata)
 
         results.to_csv(prefix="location_"+location_name+"_"+str(len(results)))
+
+        # import matplotlib.pyplot as plt
+        # plt.show()
 
 if __name__ == "__main__":
     main()
