@@ -16,21 +16,22 @@ np.random.seed(314)
 
 # methods and thresholds to test
 METHODS = {
-            # "edm" : [0,0.5,0.54,0.56,0.566,0.568,0.57,0.572,0.574,0.58,0.6],
-            "ss" : [0.] #,5,10,20],
-            # "residual" : [0,50,250,500,1000,2000,3000,4000,5000,10000,100000],
+            "edm" : [0,0.5,0.54,0.56,0.566,0.568,0.57,0.572,0.574,0.58,0.6],
+            # "ss" : [0.] #,5,10,20],
+            "residual" : [0,50,250,500,1000,2000,3000,4000,5000,10000,100000],
            }
-NUM_FAULTS = [1]
-# NUM_FAULTS = [1,2,4,8,12]
-BIAS_VALUES = [60]
-# BIAS_VALUES = [60,40,20,10]
+# NUM_FAULTS = [1]
+NUM_FAULTS = [1,2,4,8,12]
+# BIAS_VALUES = [60]
+BIAS_VALUES = [60,40,20,10]
 
 def main():
 
-    data_dir = os.path.join(os.getcwd(),"data","simulated")
+    data_dir = os.path.join(os.path.dirname(
+            os.path.realpath(__file__)),"data","simulated")
     processes = [Process(target=location_fde,
                          args=(os.path.join(data_dir,csv_file),)) \
-                         for csv_file in [sorted(os.listdir(data_dir))[0]]]
+                         for csv_file in sorted(os.listdir(data_dir))]
 
     PROCESS_PARALLEL = 3
     for ii in range(int(np.ceil(len(processes)/PROCESS_PARALLEL))):
@@ -69,7 +70,7 @@ def location_fde(csv_path):
     print("location:",location_name)
     full_data_original = glp.NavData(csv_path=csv_path)
     ## TODO:
-    # full_data_original = full_data_original.where("gps_millis",np.unique(full_data_original["gps_millis"])[0])
+    # full_data_original = full_data_original.where("gps_millis",np.unique(full_data_original["gps_millis"])[0:5])
 
     for num_faults in NUM_FAULTS:
         print(location_name,"faults:",num_faults)
@@ -123,7 +124,7 @@ def location_fde(csv_path):
                     metrics, navdata = glp.evaluate_fde(input_navdata,method=method,
                                                         threshold=threshold,
                                                         max_faults=num_faults,
-                                                        verbose=True,
+                                                        verbose=False,
                                                         time_fde=True)
 
                     metrics_navdata = glp.NavData()

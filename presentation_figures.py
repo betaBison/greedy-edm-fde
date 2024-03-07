@@ -13,7 +13,7 @@ from sklearn import metrics as sk
 import matplotlib.pyplot as plt
 import gnss_lib_py as glp
 from gnss_lib_py.algorithms.fde import _edm_from_satellites_ranges
-from gnss_lib_py.utils.visualizations import _save_figure
+from gnss_lib_py.visualizations.style import save_figure
 
 np.random.seed(314)
 
@@ -32,7 +32,8 @@ locations = {
 def main():
 
     # update results directory and result file name here
-    results_dir = os.path.join(os.getcwd(),"results","<results directory>")
+    # results_dir = os.path.join(os.getcwd(),"<results directory>")
+    results_dir = os.path.join(os.getcwd(),"results","20240307094410")
     results_path = os.path.join(results_dir,"fde_11880_navdata.csv")
 
     # timing plots
@@ -153,7 +154,7 @@ def auc_table(results_path):
     """
 
     navdata = glp.NavData(csv_path = results_path)
-    navdata_cropped = navdata.where("bias",60).where("faults",12).concat(navdata.where("bias",10).where("faults",1))
+    navdata_cropped = glp.concat(navdata.where("bias",60).where("faults",12),navdata.where("bias",10).where("faults",1))
 
     navdata_cropped["glp_label"] = create_label([navdata_cropped["bias"].astype(str),
                                                  navdata_cropped["faults"].astype(str),
@@ -186,7 +187,7 @@ def auc_table(results_path):
 
             label_navdata[method + "_auc"] = np.round(auc,2)
 
-        navdata_auc = navdata_auc.concat(label_navdata)
+        navdata_auc = glp.concat(navdata_auc,label_navdata)
 
     navdata_auc.to_csv(prefix="auc_latex",sep="&",lineterminator="\\\\\n")
     navdata_auc.to_csv(prefix="auc")
@@ -269,7 +270,7 @@ def timing_plots_calculations(results_path):
             single_navdata["max_compute_time_ms"] = np.max(v)
             single_navdata["median_compute_time_ms"] = np.median(v)
             single_navdata["std_compute_time_ms"] = np.std(v)
-            faults_navdata = faults_navdata.concat(single_navdata)
+            faults_navdata = glp.concat(faults_navdata,single_navdata)
         for k,v in timing_measurements[method].items():
             single_navdata = glp.NavData()
             single_navdata["method"] = np.array([method])
@@ -279,7 +280,7 @@ def timing_plots_calculations(results_path):
             single_navdata["max_compute_time_ms"] = np.max(v)
             single_navdata["median_compute_time_ms"] = np.median(v)
             single_navdata["std_compute_time_ms"] = np.std(v)
-            measurements_navdata = measurements_navdata.concat(single_navdata)
+            measurements_navdata = glp.concat(measurements_navdata,single_navdata)
 
     measurements_navdata.to_csv(output_path=os.path.join(os.path.dirname(results_path),
                                                          "measurements_timing.csv"))
@@ -299,8 +300,8 @@ def timing_plots(results_dir):
     faults_navdata = glp.NavData(csv_path=os.path.join(results_dir,"faults_timing.csv"))
     measurements_navdata = glp.NavData(csv_path=os.path.join(results_dir,"measurements_timing.csv"))
 
-    faults_navdata.sort("faults",inplace=True)
-    measurements_navdata.sort("measurements",inplace=True)
+    glp.sort(faults_navdata,"faults",inplace=True)
+    glp.sort(measurements_navdata,"measurements",inplace=True)
 
     for graph_type in ["faults","measurements"]:
         if graph_type == "faults":
@@ -320,12 +321,14 @@ def timing_plots(results_dir):
         plt.gca().set_prop_cycle(None)
         for method in ["edm","residual"]:
             navdata_std = navdata_plot.where("method",method)
-            plt.fill_between(navdata_std[graph_type],
-                             navdata_std["mean_compute_time_ms"] - 1*navdata_std["std_compute_time_ms"],
-                             navdata_std["mean_compute_time_ms"] + 1*navdata_std["std_compute_time_ms"],
-                             alpha=0.5)
+            # print(navdata_std[graph_type])
+            if len(navdata_std) > 1:
+                plt.fill_between(navdata_std[graph_type],
+                                 navdata_std["mean_compute_time_ms"] - 1*navdata_std["std_compute_time_ms"],
+                                 navdata_std["mean_compute_time_ms"] + 1*navdata_std["std_compute_time_ms"],
+                                 alpha=0.5)
         plt.yscale("log")
-        _save_figure(fig,graph_type+"_"+"mean_compute_time_ms")
+        save_figure(fig,graph_type+"_"+"mean_compute_time_ms")
 
 def accuracy_plots(results_path):
     """Create accuracy plots.
@@ -423,7 +426,7 @@ def simulated_data_metrics():
         metrics_subset["sats_in_view"] = sats_in_view
         metrics_subset["gps_millis"] = gps_millis
         metrics_subset["location_name"] = np.array([location_name]*len(sats_in_view))
-        metrics.concat(metrics_subset,inplace=True)
+        metrics = glp.concat(metrics,metrics_subset)
 
     print("total_timesteps:",len(np.unique(metrics["gps_millis"])),len(metrics))
     print("min sats in view:",np.min(metrics["sats_in_view"]))
@@ -455,14 +458,14 @@ def plot_sats_in_view():
         metrics_subset["sats_in_view"] = sats_in_view
         metrics_subset["gps_millis"] = gps_millis
         metrics_subset["location_name"] = np.array([location_name]*len(sats_in_view))
-        metrics.concat(metrics_subset,inplace=True)
+        metrics = glp.concat(metrics,metrics_subset)
 
     metrics["time_hr"] = (metrics["gps_millis"] - metrics["gps_millis",0])/(1000*60*60.)
 
     fig = glp.plot_metric(metrics,"time_hr","sats_in_view",
                           groupby="location_name")
     plt.xlim([0,24])
-    _save_figure(fig,"sats_in_view")
+    save_figure(fig,"sats_in_view")
 
 def world_skyplots():
     """Plot the chosen world skkyplots.
@@ -534,7 +537,8 @@ def moving_svd(noise):
     fig = plt.figure(figsize=(3.5,3.5))
     plt.imshow(np.abs(svd_u),cmap="cividis")
     plt.colorbar()
-    _save_figure(fig,"u_1_faults")
+    save_figure(fig,"u_1_faults")
+
 
 def moving_eigenvalues(noise):
     """Plot the singular values from singular value decomposition.
@@ -576,11 +580,11 @@ def moving_eigenvalues(noise):
     plt.yscale("log")
     plt.ylim(1E-5,1E17)
     if noise:
-        _save_figure(fig,"faults_with_noise_"+str(0).zfill(2))
-        _save_figure(fig,"faults_with_noise_"+str(19).zfill(2))
+        save_figure(fig,"faults_with_noise_"+str(0).zfill(2))
+        save_figure(fig,"faults_with_noise_"+str(19).zfill(2))
     else:
-        _save_figure(fig,"faults_"+str(0).zfill(2))
-        _save_figure(fig,"faults_"+str(19).zfill(2))
+        save_figure(fig,"faults_"+str(0).zfill(2))
+        save_figure(fig,"faults_"+str(19).zfill(2))
 
 
     for i in range(1,10):
@@ -603,7 +607,7 @@ def moving_eigenvalues(noise):
         else:
             data_fault["number_of_faults"] = np.array([str(i) + " faults"]*len(data_fault))
 
-        data.concat(data_fault,inplace=True)
+        data = glp.concat(data,data_fault)
         plt.rcParams['figure.figsize'] = [5.9, 3.5]
         fig = glp.plot_metric(data,"eigenvalue_magnitude",
                               groupby="number_of_faults",
@@ -612,11 +616,13 @@ def moving_eigenvalues(noise):
         plt.yscale("log")
         plt.ylim(1E-5,1E17)
         if noise:
-            _save_figure(fig,"faults_with_noise_"+str(i).zfill(2))
-            _save_figure(fig,"faults_with_noise_"+str(19-i).zfill(2))
+            save_figure(fig,"faults_with_noise_"+str(i).zfill(2))
+            save_figure(fig,"faults_with_noise_"+str(19-i).zfill(2))
         else:
-            _save_figure(fig,"faults_"+str(i).zfill(2))
-            _save_figure(fig,"faults_"+str(19-i).zfill(2))
+            save_figure(fig,"faults_"+str(i).zfill(2))
+            save_figure(fig,"faults_"+str(19-i).zfill(2))
+
+        plt.close(fig)
 
 if __name__ == "__main__":
     main()
