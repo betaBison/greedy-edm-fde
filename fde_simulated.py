@@ -18,12 +18,9 @@ np.random.seed(314)
 # methods and thresholds to test
 METHODS = {
             "edm" : [0,0.5,0.54,0.56,0.566,0.568,0.57,0.572,0.574,0.58,0.6],
-            # "ss" : [0.] #,5,10,20],
             "residual" : [0,50,250,500,1000,2000,3000,4000,5000,10000,100000],
            }
-# NUM_FAULTS = [1]
 NUM_FAULTS = [1,2,4,8,12]
-# BIAS_VALUES = [60]
 BIAS_VALUES = [60,40,20,10]
 
 def main():
@@ -73,8 +70,6 @@ def location_fde(csv_path):
     location_name = "_".join(os.path.basename(csv_path).split("_")[:-1])
     print("location:",location_name)
     full_data_original = glp.NavData(csv_path=csv_path)
-    ## TODO:
-    # full_data_original = full_data_original.where("gps_millis",np.unique(full_data_original["gps_millis"])[0:5])
 
     for num_faults in NUM_FAULTS:
         print(location_name,"faults:",num_faults)
@@ -90,11 +85,9 @@ def location_fde(csv_path):
             raw_pr_m = []
             for timestamp, _, navdata in glp.loop_time(full_data,"gps_millis"):
 
-                # navdata = navdata.copy(cols=list(np.arange(10)))
                 if i % 100 == 0:
                     print("t:",timestamp)
 
-                # faulty_idx = list(np.random.randint(0,len(navdata),size=int(0.5*len(navdata))))
                 rand_index_order = np.arange(len(navdata))
                 np.random.shuffle(rand_index_order)
 
@@ -152,9 +145,6 @@ def location_fde(csv_path):
                     results = glp.concat(results,metrics_navdata)
 
         results.to_csv(prefix="location_"+location_name+"_"+str(len(results)))
-
-        # import matplotlib.pyplot as plt
-        # plt.show()
 
 if __name__ == "__main__":
     main()
