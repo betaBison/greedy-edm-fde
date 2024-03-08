@@ -8,6 +8,7 @@ __date__ = "15 Aug 2023"
 import os
 from multiprocessing import Process
 
+import time
 import numpy as np
 import gnss_lib_py as glp
 from gnss_lib_py.utils.file_operations import TIMESTAMP
@@ -27,6 +28,7 @@ BIAS_VALUES = [60,40,20,10]
 
 def main():
 
+    time_start = time.time()
     data_dir = os.path.join(os.path.dirname(
             os.path.realpath(__file__)),"data","simulated")
     processes = [Process(target=location_fde,
@@ -44,6 +46,8 @@ def main():
             process.join()
 
         print('Done')
+        print(ii,"finished in:",
+              round((time.time()-time_start)/60,2),"minutes")
 
     results = glp.NavData()
     results_dir = os.path.join(os.getcwd(),"results",TIMESTAMP)
@@ -123,7 +127,7 @@ def location_fde(csv_path):
                     input_navdata = full_data.copy()
                     metrics, navdata = glp.evaluate_fde(input_navdata,method=method,
                                                         threshold=threshold,
-                                                        max_faults=num_faults,
+                                                        # max_faults=num_faults,
                                                         verbose=False,
                                                         time_fde=True)
 
