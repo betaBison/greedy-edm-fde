@@ -32,7 +32,7 @@ locations = {
 def main():
 
     # update results directory and result file name here
-    results_dir = os.path.join(os.getcwd(),"<results directory>")
+    results_dir = os.path.join(os.getcwd(),"results","<results directory>")
     results_path = os.path.join(results_dir,"fde_11880_navdata.csv")
 
     # timing plots
