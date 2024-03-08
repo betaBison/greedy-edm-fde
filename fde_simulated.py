@@ -8,6 +8,7 @@ __date__ = "15 Aug 2023"
 import os
 from multiprocessing import Process
 
+import time
 import numpy as np
 import gnss_lib_py as glp
 from gnss_lib_py.utils.file_operations import TIMESTAMP
@@ -24,7 +25,9 @@ BIAS_VALUES = [60,40,20,10]
 
 def main():
 
-    data_dir = os.path.join(os.getcwd(),"data","simulated")
+    time_start = time.time()
+    data_dir = os.path.join(os.path.dirname(
+            os.path.realpath(__file__)),"data","simulated")
     processes = [Process(target=location_fde,
                          args=(os.path.join(data_dir,csv_file),)) \
                          for csv_file in sorted(os.listdir(data_dir))]
@@ -40,12 +43,14 @@ def main():
             process.join()
 
         print('Done')
+        print(ii,"finished in:",
+              round((time.time()-time_start)/60,2),"minutes")
 
     results = glp.NavData()
     results_dir = os.path.join(os.getcwd(),"results",TIMESTAMP)
     for navdata_file in sorted(os.listdir(results_dir)):
         if navdata_file[:9] == "location_":
-            results = results.concat(glp.NavData(csv_path=os.path.join(results_dir,
+            results = glp.concat(results,glp.NavData(csv_path=os.path.join(results_dir,
                                                          navdata_file)))
 
     results.to_csv(prefix="fde_"+str(len(results)))
@@ -78,13 +83,11 @@ def location_fde(csv_path):
             fault_gt = []
             corr_pr_m = []
             raw_pr_m = []
-            for timestamp, _, navdata in full_data.loop_time("gps_millis"):
+            for timestamp, _, navdata in glp.loop_time(full_data,"gps_millis"):
 
-                # navdata = navdata.copy(cols=list(np.arange(10)))
                 if i % 100 == 0:
                     print("t:",timestamp)
 
-                # faulty_idx = list(np.random.randint(0,len(navdata),size=int(0.5*len(navdata))))
                 rand_index_order = np.arange(len(navdata))
                 np.random.shuffle(rand_index_order)
 
@@ -117,7 +120,7 @@ def location_fde(csv_path):
                     input_navdata = full_data.copy()
                     metrics, navdata = glp.evaluate_fde(input_navdata,method=method,
                                                         threshold=threshold,
-                                                        # max_faults=10,
+                                                        # max_faults=num_faults,
                                                         verbose=False,
                                                         time_fde=True)
 
@@ -139,7 +142,7 @@ def location_fde(csv_path):
                     navdata_prefix = "_".join(navdata_prefix).replace(".","")
                     navdata.to_csv(prefix=navdata_prefix)
 
-                    results.concat(metrics_navdata,inplace=True)
+                    results = glp.concat(results,metrics_navdata)
 
         results.to_csv(prefix="location_"+location_name+"_"+str(len(results)))
 

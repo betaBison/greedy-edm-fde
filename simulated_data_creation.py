@@ -68,7 +68,7 @@ for location_name, location_tuple in locations.items():
 
         navdata_without_time["gps_millis"] = timestep
 
-        navdata_full = navdata_full.concat(navdata_without_time.copy(),axis=1)
+        navdata_full = glp.concat(navdata_full,navdata_without_time.copy(),axis=1)
 
     print("adding sv times")
     navdata = glp.add_sv_states(navdata_full, source="precise",
