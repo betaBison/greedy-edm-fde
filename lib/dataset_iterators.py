@@ -1,6 +1,7 @@
 """Iterate through dataset files.
 
 Currently compatible for:
+- Android 2023 (AndroidDerived2023, AndroidGroundTruth2023)
 - Android 2021 (AndroidDerived2021, AndroidGroundTruth2021)
 - Android 2022 (AndroidDerived2022, AndroidGroundTruth2022)
 - SmartLoc
@@ -14,7 +15,112 @@ import os
 
 import numpy as np
 import gnss_lib_py as glp
-from gnss_lib_py.utils import constants as consts
+
+class Android2023Iterator():
+
+    def __init__ (self, train_path, load_gt=True,
+                  load_raw=False, filter_measurements=True):
+        """Load Android 2023 Dataset
+
+        Parameters
+        ----------
+        train_path : string or path-like
+            Path to train folder of data
+        load_gt : bool
+            If true, will load ground truth data.
+        load_raw : bool
+            If true, will load raw data.
+
+        """
+        self.train_path = train_path
+        self.load_gt = load_gt
+        self.load_raw = load_raw
+        self.filter_measurements = filter_measurements
+
+    def run(self, trace, derived=None, ground_truth=None, raw=None):
+        """Run function to overwrite.
+
+        trace : list
+            Name of data/place and then name of phone.
+        derived : gnss_lib_py.parsers.google_decimeter.AndroidDerived2022
+            Derived data.
+        ground_truth : gnss_lib_py.parsers.google_decimeter.AndroidGroundTruth2022
+            Ground truth data.
+        raw : gnss_lib_py.parsers.google_decimeter.AndroidRawGnss
+            Raw data.
+
+        """
+        raise NotImplementedError("must overwrite run function")
+
+    def single_run(self, trace):
+        """Load and run single trace.
+
+        Parameters
+        ----------
+        trace : list
+            Includes trace run and phone name as strings.
+
+        """
+        data_path = self.train_path
+
+        trace_path = os.path.join(data_path,trace[0],trace[1],"device_gnss.csv")
+        # convert data to Measurement class
+        derived_data = glp.AndroidDerived2023(trace_path)
+
+        if self.load_gt:
+            gt_path = os.path.join(data_path,trace[0],trace[1],"ground_truth.csv")
+            gt_data = glp.AndroidGroundTruth2023(gt_path)
+        else:
+            gt_data = None
+
+        if self.load_raw:
+            raw_path = os.path.join(data_path,trace[0],trace[1],
+                                    "supplemental","gnss_log.txt")
+            raw_data = glp.AndroidRawGnss(raw_path,
+                                      filter_measurements=self.filter_measurements)
+        else:
+            raw_data = None
+
+        print("2023",trace[0],trace[1])
+
+        output = self.run(trace, derived_data, gt_data, raw_data)
+
+        return output
+
+    def iterate(self):
+        """Iterate over entire dataset.
+
+        Calls ``run`` function on each derived/ground truth pair.
+
+        """
+        data_path = self.train_path
+
+        # get all trace options
+        trace_names = sorted(os.listdir(data_path))
+        # create a list of all traces with phone types
+        trace_list = []
+        for trace_name in trace_names:
+            trace_path = os.path.join(data_path,trace_name)
+            if not os.path.isdir(trace_path):
+                continue
+            for phone_type in sorted(os.listdir(trace_path)):
+                if phone_type in ("mi8",
+                                  "sm-g988b",
+                                  "sm-g955f",
+                                  "samsungs21ultra",
+                                  "pixel6pro",
+                                  "pixel7",
+                                  "pixel7pro",
+                                  ):
+                    trace_list.append((trace_name,phone_type))
+
+        outputs = []
+        for trace_idx, trace in enumerate(trace_list):
+            print(trace_idx+1,"/",len(trace_list))
+            output = self.single_run(trace)
+            outputs.append(output)
+
+        return outputs
 
 class Android2021Iterator():
 
