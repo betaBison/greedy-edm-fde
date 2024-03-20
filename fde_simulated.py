@@ -6,9 +6,9 @@ __authors__ = "D. Knowles"
 __date__ = "15 Aug 2023"
 
 import os
+import time
 from multiprocessing import Process
 
-import time
 import numpy as np
 import gnss_lib_py as glp
 from gnss_lib_py.utils.file_operations import TIMESTAMP

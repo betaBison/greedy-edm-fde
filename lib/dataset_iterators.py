@@ -87,7 +87,7 @@ class Android2023Iterator():
 
         return output
 
-    def iterate(self):
+    def iterate(self, return_traces=False):
         """Iterate over entire dataset.
 
         Calls ``run`` function on each derived/ground truth pair.
@@ -114,6 +114,8 @@ class Android2023Iterator():
                                   ):
                     trace_list.append((trace_name,phone_type))
 
+        if return_traces:
+            return trace_list
         outputs = []
         for trace_idx, trace in enumerate(trace_list):
             print(trace_idx+1,"/",len(trace_list))
