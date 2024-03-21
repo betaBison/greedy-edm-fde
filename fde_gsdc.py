@@ -16,11 +16,11 @@ from lib.dataset_iterators import Android2023Iterator
 
 # methods and thresholds to test
 METHODS = {
-            "edm" : [0,0.4,0.5,0.6,0.7,0.8,0.9,1.0],
-            "residual" : [0,10,100, 1000, 10000],
+            "edm" : [0,0.5,0.6,0.7,1.0],
+            "residual" : [0,100,1000,10000],
            }
 # number of processes to run at the same time
-PROCESS_PARALLEL = 8
+PROCESS_PARALLEL = 3
 
 
 def main():
@@ -35,7 +35,7 @@ def main():
     android2023.run = test_function
     # iterate across dataset
     trace_list = android2023.iterate(return_traces = True)
-    trace_list = trace_list[:8]
+    trace_list = trace_list[:3]
     print(trace_list)
 
     # first trace

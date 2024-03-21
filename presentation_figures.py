@@ -35,37 +35,42 @@ def main():
     results_dir = os.path.join(os.getcwd(),"results","<results directory>")
     results_path = os.path.join(results_dir,"fde_11880_navdata.csv")
 
-    # timing plots
-    print("timing plots")
-    timing_plots_calculations(results_path)
-    timing_plots(results_dir)
+    gsdc_dir = os.path.join(os.getcwd(),"results","20240320140831")
+    gsdc_state_path = os.path.join(gsdc_dir,"fde_state_104_navdata.csv")
+    gsdc_error(gsdc_state_path)
 
-    print("eigenvalue plots")
-    # without measurement noise
-    moving_eigenvalues(noise=False)
-    # with measurement noise
-    moving_eigenvalues(noise=True)
-
-    # singular value U matrix
-    print("singular value plot")
-    moving_svd(noise=False)
-
-    # skyplots from simulated data
-    # world_skyplots_check()
-    print("skykplots")
-    world_skyplots()
-
-    print("satellites in view")
-    plot_sats_in_view()
-
-    #accuracy plots
-    # accuracy_plots(results_path)
-
-    # roc curve
-    print("roc curve")
-    roc_curve(results_path)
-    print("auc table")
-    auc_table(results_path)
+    #
+    # # timing plots
+    # print("timing plots")
+    # timing_plots_calculations(results_path)
+    # timing_plots(results_dir)
+    #
+    # print("eigenvalue plots")
+    # # without measurement noise
+    # moving_eigenvalues(noise=False)
+    # # with measurement noise
+    # moving_eigenvalues(noise=True)
+    #
+    # # singular value U matrix
+    # print("singular value plot")
+    # moving_svd(noise=False)
+    #
+    # # skyplots from simulated data
+    # # world_skyplots_check()
+    # print("skykplots")
+    # world_skyplots()
+    #
+    # print("satellites in view")
+    # plot_sats_in_view()
+    #
+    # #accuracy plots
+    # # accuracy_plots(results_path)
+    #
+    # # roc curve
+    # print("roc curve")
+    # roc_curve(results_path)
+    # print("auc table")
+    # auc_table(results_path)
 
     plt.show()
 
@@ -93,6 +98,46 @@ def create_label(items):
         label = np.char.add(label,items[l_index])
 
     return label
+
+def gsdc_error(results_path):
+    """Plot the state error.
+
+    Parameters
+    ----------
+    results_path : string
+        Paths to saved state metrics.
+
+    """
+
+
+    navdata = glp.NavData(csv_path = results_path)
+    navdata["threshold2"] = np.nan_to_num(navdata["threshold"])
+
+    fig = glp.plot_metric(navdata.where("method",("all","gt_nonfaulty")),
+                          "threshold2",
+                          "horizontal_50_95",
+                           groupby="method",
+                           linestyle="none",
+                          )
+
+    fig = glp.plot_metric(navdata.where("method","edm"),
+                          "threshold2",
+                          "horizontal_50_95",
+                           groupby="method",
+                           linestyle="none",
+                          )
+
+    fig = glp.plot_metric(navdata.where("method","residual"),
+                          "threshold2",
+                          "horizontal_50_95",
+                           groupby="method",
+                           linestyle="none",
+                          )
+    plt.xscale("log")
+
+
+
+
 
 def roc_curve(results_path):
     """Plot the ROC curve.
