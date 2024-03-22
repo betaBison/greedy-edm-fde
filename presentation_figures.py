@@ -35,13 +35,14 @@ def main():
     results_dir = os.path.join(os.getcwd(),"results","<results directory>")
     results_path = os.path.join(results_dir,"fde_11880_navdata.csv")
 
-    gsdc_dir = os.path.join(os.getcwd(),"results","20240321172436")
-    gsdc_state_path = os.path.join(gsdc_dir,"fde_state_352_navdata.csv")
+    gsdc_dir = os.path.join(os.getcwd(),"results","20240321223431")
+    gsdc_state_path = os.path.join(gsdc_dir,"fde_state_1360_navdata.csv")
     gsdc_error(gsdc_state_path)
 
-    gsdc_timing_path = os.path.join(gsdc_dir,"fde_352_navdata.csv")
+    gsdc_timing_path = os.path.join(gsdc_dir,"fde_1360_navdata.csv")
     # gsdc_timing_plots_calculations(gsdc_timing_path)
     gsdc_timing_plots(gsdc_dir)
+
 
 
     #
@@ -126,14 +127,13 @@ def gsdc_error(results_path):
                            avg_y = True,
                           )
 
-    fig = glp.plot_metric(navdata.where("method","edm"),
+    fig = glp.plot_metric(navdata.where("method","edm").where("threshold",(0.40,0.7),"neq"),
                           "threshold2",
                           "horizontal_50_95",
                            groupby="method",
                            linestyle="none",
                            avg_y = True,
                           )
-    navdata["threshold2"] = navdata["threshold2"] + 1
     fig = glp.plot_metric(navdata.where("method","residual"),
                           "threshold2",
                           "horizontal_50_95",
@@ -168,7 +168,7 @@ def gsdc_timing_plots_calculations(results_path):
     for glp_label in np.unique(navdata["glp_label"]):
         print("calculating timing for:",glp_label)
         navdata_cropped = navdata.where("glp_label",glp_label)
-        row_idx = np.argmax(navdata_cropped["balanced_accuracy"])
+        row_idx = np.argmin(navdata_cropped["horizontal_50_95"])
         method = navdata_cropped["method",row_idx].item()
         trace = navdata_cropped["trace",row_idx].item()
         phone = navdata_cropped["phone",row_idx].item()
@@ -227,7 +227,7 @@ def gsdc_timing_plots(results_dir):
     glp.sort(measurements_navdata,"measurements",inplace=True)
 
     for graph_type in ["measurements"]:
-        navdata_plot = measurements_navdata
+        navdata_plot = measurements_navdata.where("measurements",25,"geq").where("measurements",45,"leq")
 
         fig = glp.plot_metric(navdata_plot,
                         graph_type,"mean_compute_time_ms",
