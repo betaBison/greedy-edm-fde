@@ -14,6 +14,7 @@ import matplotlib.pyplot as plt
 import gnss_lib_py as glp
 from gnss_lib_py.algorithms.fde import _edm_from_satellites_ranges
 from gnss_lib_py.visualizations.style import save_figure
+from gnss_lib_py.visualizations.plot_metric import  _get_new_fig
 
 np.random.seed(314)
 
@@ -119,29 +120,90 @@ def gsdc_error(results_path):
     navdata = glp.NavData(csv_path = results_path)
     navdata["threshold2"] = np.nan_to_num(navdata["threshold"])
 
-    fig = glp.plot_metric(navdata.where("method",("all","gt_nonfaulty")),
+    all_score = np.mean(navdata.where("method","all").where("horizontal_50_95",300,"leq")["horizontal_50_95"])
+    nonfaulty_score = np.mean(navdata.where("method","gt_nonfaulty").where("horizontal_50_95",300,"leq")["horizontal_50_95"])
+    fig = glp.plot_metric(navdata.where("method",("all","gt_nonfaulty")).where("horizontal_50_95",300,"leq"),
                           "threshold2",
                           "horizontal_50_95",
                            groupby="method",
                            linestyle="none",
-                           avg_y = True,
+                           # avg_y = True,
                           )
 
     fig = glp.plot_metric(navdata.where("method","edm").where("threshold",(0.40,0.7),"neq"),
-                          "threshold2",
+                          "threshold",
                           "horizontal_50_95",
                            groupby="method",
                            linestyle="none",
                            avg_y = True,
+                           save=True,
+                           markersize=10,
+                           color="C0",
+                           title="MEAN OF 50th & 95th PERCENTILE ERRORS",
                           )
+    plt.plot([0.,1.],[nonfaulty_score,nonfaulty_score],
+            linewidth=5.0,
+            marker=",",
+            markersize=0,
+            linestyle="dotted",
+            color="C2",
+            label='"MULTIPATH" REMOVED',
+            )
+    plt.plot([0.,1.],[all_score,all_score],
+            linewidth=5.0,
+            marker=",",
+            markersize=0,
+            color="C3",
+            label="ALL MEASUREMENTS",
+            )
+
+    plt.ylim(4,10)
+    plt.xlim(0.40,0.7)
+    plt.ylabel("HORIZONTAL DISTANCE ERROR")
+    plt.legend(loc="upper left", bbox_to_anchor=(1.05, 1),
+                   title="METHOD")
+    fig.set_layout_engine(layout="tight")
+    save_figure(fig,"gsdc_edm_error")
+
+
+
     fig = glp.plot_metric(navdata.where("method","residual"),
-                          "threshold2",
+                          "threshold",
                           "horizontal_50_95",
                            groupby="method",
                            linestyle="none",
                            avg_y = True,
+                           save=True,
+                           color="C1",
+                           marker="*",
+                           markersize=10,
+                           title="MEAN OF 50th & 95th PERCENTILE ERRORS",
                           )
+
+    plt.plot([0.1,10E6],[nonfaulty_score,nonfaulty_score],
+            linewidth=5.0,
+            linestyle="dotted",
+            marker=",",
+            markersize=0,
+            label='"MULTIPATH" REMOVED',
+            color="C2"
+            )
+    plt.plot([0.1,10E6],[all_score,all_score],
+            linewidth=5.0,
+            marker=",",
+            markersize=0,
+            label="ALL MEASUREMENTS",
+            color="C3"
+            )
+    plt.ylabel("HORIZONTAL DISTANCE ERROR")
+    plt.legend(loc="upper left", bbox_to_anchor=(1.05, 1),
+                   title="METHOD")
+
     plt.xscale("log")
+    plt.ylim(4,10)
+    plt.xlim(3,3E5)
+    fig.set_layout_engine(layout="tight")
+    save_figure(fig,"gsdc_residual_error")
 
 def gsdc_timing_plots_calculations(results_path):
     """Calculations for the timing plots.
@@ -226,65 +288,30 @@ def gsdc_timing_plots(results_dir):
 
     glp.sort(measurements_navdata,"measurements",inplace=True)
 
-    for graph_type in ["measurements"]:
-        navdata_plot = measurements_navdata.where("measurements",25,"geq").where("measurements",45,"leq")
+    navdata_plot = measurements_navdata.where("measurements",25,"geq").where("measurements",45,"leq")
 
-        fig = glp.plot_metric(navdata_plot,
-                        graph_type,"mean_compute_time_ms",
-                        groupby="method",
-                        save=False,
-                        linewidth=5.0,
-                        markersize=10,
-                        linestyle="None",
-                        )
+    fig = glp.plot_metric(navdata_plot,
+                    "measurements","mean_compute_time_ms",
+                    groupby="method",
+                    save=False,
+                    linewidth=5.0,
+                    markersize=10,
+                    linestyle="None",
+                    )
 
-        plt.gca().set_prop_cycle(None)
-        for method in ["edm","residual"]:
-            navdata_std = navdata_plot.where("method",method)
-            # print(navdata_std[graph_type])
-            if len(navdata_std) > 1:
-                plt.fill_between(navdata_std[graph_type],
-                                 navdata_std["mean_compute_time_ms"] - 1*navdata_std["std_compute_time_ms"],
-                                 navdata_std["mean_compute_time_ms"] + 1*navdata_std["std_compute_time_ms"],
-                                 alpha=0.5)
-        plt.yscale("log")
-        save_figure(fig,graph_type+"_"+"mean_compute_time_ms")
-
-
-    # navdata = glp.NavData(csv_path = results_path)
-    # for row in navdata.rows:
-    #     print(row)
-    #
-    # navdata["threshold2"] = np.nan_to_num(navdata["threshold"])
-    #
-    # fig = glp.plot_metric(navdata.where("method",("all","gt_nonfaulty")),
-    #                       "threshold2",
-    #                       "timestep_mean_ms",
-    #                        groupby="method",
-    #                        linestyle="none",
-    #                        avg_y = True,
-    #                       )
-    #
-    # fig = glp.plot_metric(navdata.where("method","edm"),
-    #                       "threshold2",
-    #                       "timestep_mean_ms",
-    #                        groupby="method",
-    #                        linestyle="none",
-    #                        avg_y = True,
-    #                       )
-    # navdata["threshold2"] = navdata["threshold2"] + 1
-    # fig = glp.plot_metric(navdata.where("method","residual"),
-    #                       "threshold2",
-    #                       "timestep_mean_ms",
-    #                        groupby="method",
-    #                        linestyle="none",
-    #                        avg_y = True,
-    #                       )
-    # plt.xscale("log")
-
-
-
-
+    plt.gca().set_prop_cycle(None)
+    for method in ["edm","residual"]:
+        navdata_std = navdata_plot.where("method",method)
+        # print(navdata_std[graph_type])
+        if len(navdata_std) > 1:
+            plt.fill_between(navdata_std["measurements"],
+                             navdata_std["mean_compute_time_ms"] - 1*navdata_std["std_compute_time_ms"],
+                             navdata_std["mean_compute_time_ms"] + 1*navdata_std["std_compute_time_ms"],
+                             alpha=0.5)
+    plt.yscale("log")
+    plt.xlim(24,46)
+    plt.xticks(range(25,46,5))
+    save_figure(fig,"gsdc_measurements_mean_compute_time_ms")
 
 def roc_curve(results_path):
     """Plot the ROC curve.
