@@ -11,16 +11,19 @@ from multiprocessing import Process
 
 import numpy as np
 import gnss_lib_py as glp
+# import matplotlib.pyplot as plt
 
 from lib.dataset_iterators import Android2023Iterator
 
 # methods and thresholds to test
 METHODS = {
-            "edm" : [0,0.5,0.6,0.7,1.0],
-            "residual" : [0,100,1000,10000],
+            "edm" : [0.4,0.45,0.5,0.52,0.54,0.55,0.56,0.58,0.6,0.65,0.7],
+            # "edm" : [0,0.5,0.6,0.7,1.0],
+            "residual" : [10,30,100,300,1000,3000,10000,30000,100000],
+            # "residual" : [0,100,1000,10000],
            }
 # number of processes to run at the same time
-PROCESS_PARALLEL = 3
+PROCESS_PARALLEL = 8
 
 
 def main():
@@ -35,8 +38,7 @@ def main():
     android2023.run = test_function
     # iterate across dataset
     trace_list = android2023.iterate(return_traces = True)
-    trace_list = trace_list[:3]
-    print(trace_list)
+    # trace_list = trace_list[:32]
 
     # first trace
     # android2023.single_run(["2020-12-10-22-17-us-ca-sjc-c", "mi8"])
@@ -161,6 +163,15 @@ def test_function(trace, derived, gt_data, raw):
 
     # derived = derived.copy(cols=list(range(0,500)))
 
+    # correct pseudorange for receiver clock bias
+    new_prs = []
+    for _, _, navdata_subset in glp.loop_time(derived,"gps_millis"):
+        wls_all = glp.solve_wls(navdata_subset)
+        new_prs_timestep = (navdata_subset["corr_pr_m"] - wls_all["b_rx_wls_m",0]).tolist()
+        new_prs += new_prs_timestep
+
+    derived["corr_pr_m"] = np.array(new_prs)
+
     print("solving all wls")
     wls_all = glp.solve_wls(derived)
 
@@ -188,6 +199,7 @@ def test_function(trace, derived, gt_data, raw):
     state_results["threshold"] = np.array([np.nan,np.nan])
     state_results["horizontal_50_95"] = np.array([stat_all,stat_nonfaulty])
 
+    # wls_methods = []
     # iterate over methods
     for method, thresholds in METHODS.items():
         print(trace[0],trace[1],"method:",method)
@@ -203,10 +215,20 @@ def test_function(trace, derived, gt_data, raw):
                                                 verbose=False,
                                                 time_fde=True,)
 
+            # compute state results
+            wls_method = glp.solve_wls(navdata.where("fault_" + method, 0))
+            # wls_method.rename({"lat_rx_wls_deg":"lat_rx_" + method + "_" + str(threshold) + "_deg",
+            #                 "lon_rx_wls_deg":"lon_rx_" + method + "_" + str(threshold) + "_deg",
+            #                 "alt_rx_wls_m":"alt_rx_" + method + "_" + str(threshold) + "_m",
+            #                 }, inplace=True)
+            # wls_methods.append(wls_method)
+            stat_method = mean_50_95_horizontal(wls_method, gt_data)
+
             metrics_navdata = glp.NavData()
             metrics_navdata["trace"] = np.array(trace[0])
             metrics_navdata["phone"] = np.array(trace[1])
             metrics_navdata["threshold"] = threshold
+            metrics_navdata["horizontal_50_95"] = stat_method
             for k,v in metrics.items():
                 metrics_navdata[k] = np.array([v])
 
@@ -222,9 +244,7 @@ def test_function(trace, derived, gt_data, raw):
 
             results = glp.concat(results,metrics_navdata)
 
-            # compute state results
-            wls_method = glp.solve_wls(navdata.where("fault_" + method, 0))
-            stat_method = mean_50_95_horizontal(wls_method, gt_data)
+
 
             state_results_temp = glp.NavData()
             state_results_temp["trace"] = np.array(trace[0])
@@ -238,8 +258,9 @@ def test_function(trace, derived, gt_data, raw):
     results.to_csv(prefix="location_"+trace[0]+"_"+trace[1]+"_"+str(len(results)))
     state_results.to_csv(prefix="loc_state_"+trace[0]+"_"+trace[1]+"_"+str(len(results)))
 
-    # print("plotting")
-    # fig = glp.plot_map(gt_data,wls_all,wls_nonfaulty)
+    # # print("plotting")
+    # wls_methods = [gt_data,wls_all] + wls_methods
+    # fig = glp.plot_map(*wls_methods)
     # fig.show()
 
 

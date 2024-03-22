@@ -35,9 +35,14 @@ def main():
     results_dir = os.path.join(os.getcwd(),"results","<results directory>")
     results_path = os.path.join(results_dir,"fde_11880_navdata.csv")
 
-    gsdc_dir = os.path.join(os.getcwd(),"results","20240320140831")
-    gsdc_state_path = os.path.join(gsdc_dir,"fde_state_104_navdata.csv")
+    gsdc_dir = os.path.join(os.getcwd(),"results","20240321172436")
+    gsdc_state_path = os.path.join(gsdc_dir,"fde_state_352_navdata.csv")
     gsdc_error(gsdc_state_path)
+
+    gsdc_timing_path = os.path.join(gsdc_dir,"fde_352_navdata.csv")
+    # gsdc_timing_plots_calculations(gsdc_timing_path)
+    gsdc_timing_plots(gsdc_dir)
+
 
     #
     # # timing plots
@@ -118,6 +123,7 @@ def gsdc_error(results_path):
                           "horizontal_50_95",
                            groupby="method",
                            linestyle="none",
+                           avg_y = True,
                           )
 
     fig = glp.plot_metric(navdata.where("method","edm"),
@@ -125,15 +131,156 @@ def gsdc_error(results_path):
                           "horizontal_50_95",
                            groupby="method",
                            linestyle="none",
+                           avg_y = True,
                           )
-
+    navdata["threshold2"] = navdata["threshold2"] + 1
     fig = glp.plot_metric(navdata.where("method","residual"),
                           "threshold2",
                           "horizontal_50_95",
                            groupby="method",
                            linestyle="none",
+                           avg_y = True,
                           )
     plt.xscale("log")
+
+def gsdc_timing_plots_calculations(results_path):
+    """Calculations for the timing plots.
+
+    Parameters
+    ----------
+    results_path : string
+        Paths to saved metrics.
+
+    """
+
+    navdata = glp.NavData(csv_path = results_path)
+    # navdata = navdata.copy(cols=list(range(0,22)))
+    navdata["glp_label"] = create_label([
+                                         navdata["trace"].astype(str),
+                                         navdata["phone"].astype(str),
+                                         navdata["method"].astype(str),
+                                         ])
+    timing_measurements = {}
+    methods = ("edm","residual")
+    for method in methods:
+        timing_measurements[method] = {}
+
+    for glp_label in np.unique(navdata["glp_label"]):
+        print("calculating timing for:",glp_label)
+        navdata_cropped = navdata.where("glp_label",glp_label)
+        row_idx = np.argmax(navdata_cropped["balanced_accuracy"])
+        method = navdata_cropped["method",row_idx].item()
+        trace = navdata_cropped["trace",row_idx].item()
+        phone = navdata_cropped["phone",row_idx].item()
+        threshold = navdata_cropped["threshold",row_idx].item()
+        if threshold == 0:
+            threshold = str(int(threshold)).zfill(4)
+        elif threshold < 1:
+            threshold = str(np.round(threshold,4)).zfill(4)
+        else:
+            threshold = str(int(threshold)).zfill(4)
+
+        file_prefix = [method,trace,phone,threshold]
+        file_name = "_".join(file_prefix).replace(".","") + "_navdata.csv"
+        file_path = os.path.join(os.path.dirname(results_path),file_name)
+        print("reading path:",file_path)
+        navdata_file = glp.NavData(csv_path=file_path)
+
+        for _, _, navdata_subset in glp.loop_time(navdata_file,"gps_millis"):
+            compute_time_ms = navdata_subset["compute_time_s",0]*1000
+            num_measurements = len(navdata_subset)
+            if num_measurements not in timing_measurements[method]:
+                timing_measurements[method][num_measurements] = [compute_time_ms]
+            else:
+                timing_measurements[method][num_measurements].append(compute_time_ms)
+
+    measurements_navdata = glp.NavData()
+    for method in methods:
+        for k,v in timing_measurements[method].items():
+            single_navdata = glp.NavData()
+            single_navdata["method"] = np.array([method])
+            single_navdata["measurements"] = k
+            single_navdata["mean_compute_time_ms"] = np.mean(v)
+            single_navdata["min_compute_time_ms"] = np.min(v)
+            single_navdata["max_compute_time_ms"] = np.max(v)
+            single_navdata["median_compute_time_ms"] = np.median(v)
+            single_navdata["std_compute_time_ms"] = np.std(v)
+            measurements_navdata = glp.concat(measurements_navdata,single_navdata)
+
+    measurements_navdata.to_csv(output_path=os.path.join(os.path.dirname(results_path),
+                                                         "gsdc_measurements_timing.csv"))
+
+def gsdc_timing_plots(results_dir):
+    """Plot the state error.
+
+    Parameters
+    ----------
+    results_path : string
+        Paths to saved state metrics.
+
+    """
+
+
+
+    measurements_navdata = glp.NavData(csv_path=os.path.join(results_dir,"gsdc_measurements_timing.csv"))
+
+    glp.sort(measurements_navdata,"measurements",inplace=True)
+
+    for graph_type in ["measurements"]:
+        navdata_plot = measurements_navdata
+
+        fig = glp.plot_metric(navdata_plot,
+                        graph_type,"mean_compute_time_ms",
+                        groupby="method",
+                        save=False,
+                        linewidth=5.0,
+                        markersize=10,
+                        linestyle="None",
+                        )
+
+        plt.gca().set_prop_cycle(None)
+        for method in ["edm","residual"]:
+            navdata_std = navdata_plot.where("method",method)
+            # print(navdata_std[graph_type])
+            if len(navdata_std) > 1:
+                plt.fill_between(navdata_std[graph_type],
+                                 navdata_std["mean_compute_time_ms"] - 1*navdata_std["std_compute_time_ms"],
+                                 navdata_std["mean_compute_time_ms"] + 1*navdata_std["std_compute_time_ms"],
+                                 alpha=0.5)
+        plt.yscale("log")
+        save_figure(fig,graph_type+"_"+"mean_compute_time_ms")
+
+
+    # navdata = glp.NavData(csv_path = results_path)
+    # for row in navdata.rows:
+    #     print(row)
+    #
+    # navdata["threshold2"] = np.nan_to_num(navdata["threshold"])
+    #
+    # fig = glp.plot_metric(navdata.where("method",("all","gt_nonfaulty")),
+    #                       "threshold2",
+    #                       "timestep_mean_ms",
+    #                        groupby="method",
+    #                        linestyle="none",
+    #                        avg_y = True,
+    #                       )
+    #
+    # fig = glp.plot_metric(navdata.where("method","edm"),
+    #                       "threshold2",
+    #                       "timestep_mean_ms",
+    #                        groupby="method",
+    #                        linestyle="none",
+    #                        avg_y = True,
+    #                       )
+    # navdata["threshold2"] = navdata["threshold2"] + 1
+    # fig = glp.plot_metric(navdata.where("method","residual"),
+    #                       "threshold2",
+    #                       "timestep_mean_ms",
+    #                        groupby="method",
+    #                        linestyle="none",
+    #                        avg_y = True,
+    #                       )
+    # plt.xscale("log")
 
 
 
