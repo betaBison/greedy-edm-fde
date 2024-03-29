@@ -18,9 +18,7 @@ from lib.dataset_iterators import Android2023Iterator
 # methods and thresholds to test
 METHODS = {
             "edm" : [0.4,0.45,0.5,0.52,0.54,0.55,0.56,0.58,0.6,0.65,0.7],
-            # "edm" : [0,0.5,0.6,0.7,1.0],
             "residual" : [10,30,100,300,1000,3000,10000,30000,100000],
-            # "residual" : [0,100,1000,10000],
            }
 # number of processes to run at the same time
 PROCESS_PARALLEL = 8
@@ -31,48 +29,12 @@ def main():
 
     """
 
-    # train_path_2023 = "/path/to/2023/dataset/train/directory/"
-    train_path_2023 = "/home/derek/datasets/sdc2023/train/"
+    train_path_2023 = "/path/to/2023/dataset/train/directory/"
     android2023 = Android2023Iterator(train_path_2023)
     # overwrite run function with what you'd like to test
     android2023.run = test_function
     # iterate across dataset
     trace_list = android2023.iterate(return_traces = True)
-    # trace_list = trace_list[:32]
-
-    # first trace
-    # android2023.single_run(["2020-12-10-22-17-us-ca-sjc-c", "mi8"])
-
-    # negative improvement
-    # android2023.single_run(["2021-07-19-20-49-us-ca-mtv-a","sm-g988b"])
-    # android2023.single_run(["2021-12-08-20-28-us-ca-lax-c","pixel6pro"])
-    # android2023.single_run(["2022-11-15-00-53-us-ca-mtv-a","pixel7pro"])
-    # android2023.single_run(["2023-03-08-21-34-us-ca-mtv-u","pixel6pro"])
-    # android2023.single_run(["2023-03-08-21-34-us-ca-mtv-u","pixel7pro"])
-    # android2023.single_run(["2023-05-09-21-32-us-ca-mtv-pe1","pixel7pro"])
-    # android2023.single_run(["2023-05-25-19-10-us-ca-sjc-be2","pixel7pro"])
-    # android2023.single_run(["2023-05-25-20-11-us-ca-sjc-he2","pixel7pro"])
-    # android2023.single_run(["2023-09-05-23-07-us-ca-routen","pixel7pro"])
-    # android2023.single_run(["2023-09-06-00-01-us-ca-routen","pixel6pro"])
-    # android2023.single_run(["2023-09-07-19-33-us-ca", "pixel6pro"])
-    # android2023.single_run(["2023-09-06-22-49-us-ca-routebb1", "pixel7pro"])
-    # android2023.single_run(["2023-09-06-18-47-us-ca","pixel6pro"])
-
-    # nan values
-    # android2023.single_run(["2021-04-02-20-43-us-ca-mtv-f","mi8"])
-    # android2023.single_run(["2021-07-19-20-49-us-ca-mtv-a","mi8"])
-    # android2023.single_run(["2021-08-04-20-40-us-ca-sjc-c","sm-g988b"])
-    # android2023.single_run(["2021-08-24-20-32-us-ca-mtv-h","sm-g988b"])
-    # android2023.single_run(["2022-01-11-18-48-us-ca-mtv-n","pixel6pro"])
-    # android2023.single_run(["2022-01-26-20-02-us-ca-mtv-pe1","mi8"])
-    # android2023.single_run(["2022-01-26-20-02-us-ca-mtv-pe1","sm-g988b"])
-    # android2023.single_run(["2022-04-01-18-22-us-ca-lax-t","mi8"])
-    # android2023.single_run(["2022-04-01-18-22-us-ca-lax-t","pixel6pro"])
-    # android2023.single_run(["2022-05-13-20-57-us-ca-mtv-pe1","pixel6pro"])
-    # android2023.single_run(["2023-09-06-00-01-us-ca-routen","sm-g955f"])
-    # android2023.single_run(["2023-09-07-22-47-us-ca-routebc2", "pixel6pro"])
-
-
 
     time_start = time.time()
     data_dir = os.path.join(os.path.dirname(
@@ -80,7 +42,6 @@ def main():
     processes = [Process(target=android2023.single_run,
                          args=(trace,)) \
                          for trace in trace_list]
-
 
     for ii in range(int(np.ceil(len(processes)/PROCESS_PARALLEL))):
         process_group = processes[ii*PROCESS_PARALLEL:(ii+1)*PROCESS_PARALLEL]
@@ -113,8 +74,6 @@ def main():
     state_results_full.to_csv(prefix="fde_state_"+str(len(results)))
 
 def mean_50_95_horizontal(state_estimate, ground_truth):
-    # for x,y,z in glp.loop_time(state_estimate,"gps_millis"):
-    #     print(x,y,z)
     glp.interpolate(state_estimate,"gps_millis",
                                      ["x_rx_wls_m","y_rx_wls_m",
                                       "z_rx_wls_m","b_rx_wls_m"],
@@ -160,8 +119,6 @@ def test_function(trace, derived, gt_data, raw):
         fault_row_name = "NLOS (0 == no, 1 == yes, 2 == No Information)"
     else:
         raise TypeError("unsupported derived data type")
-
-    # derived = derived.copy(cols=list(range(0,500)))
 
     # correct pseudorange for receiver clock bias
     new_prs = []
@@ -217,11 +174,6 @@ def test_function(trace, derived, gt_data, raw):
 
             # compute state results
             wls_method = glp.solve_wls(navdata.where("fault_" + method, 0))
-            # wls_method.rename({"lat_rx_wls_deg":"lat_rx_" + method + "_" + str(threshold) + "_deg",
-            #                 "lon_rx_wls_deg":"lon_rx_" + method + "_" + str(threshold) + "_deg",
-            #                 "alt_rx_wls_m":"alt_rx_" + method + "_" + str(threshold) + "_m",
-            #                 }, inplace=True)
-            # wls_methods.append(wls_method)
             stat_method = mean_50_95_horizontal(wls_method, gt_data)
 
             metrics_navdata = glp.NavData()
@@ -257,12 +209,6 @@ def test_function(trace, derived, gt_data, raw):
 
     results.to_csv(prefix="location_"+trace[0]+"_"+trace[1]+"_"+str(len(results)))
     state_results.to_csv(prefix="loc_state_"+trace[0]+"_"+trace[1]+"_"+str(len(results)))
-
-    # # print("plotting")
-    # wls_methods = [gt_data,wls_all] + wls_methods
-    # fig = glp.plot_map(*wls_methods)
-    # fig.show()
-
 
 if __name__ == "__main__":
     main()

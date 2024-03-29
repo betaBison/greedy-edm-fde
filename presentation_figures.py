@@ -33,51 +33,50 @@ locations = {
 def main():
 
     # update results directory and result file name here
-    results_dir = os.path.join(os.getcwd(),"results","<results directory>")
-    results_path = os.path.join(results_dir,"fde_11880_navdata.csv")
+    simulated_results_dir = os.path.join(os.getcwd(),"results","<simulated results directory>")
+    simulated_results_path = os.path.join(simulated_results_dir,"fde_<simulated #>_navdata.csv")
 
-    gsdc_dir = os.path.join(os.getcwd(),"results","20240321223431")
-    gsdc_state_path = os.path.join(gsdc_dir,"fde_state_1360_navdata.csv")
+    gsdc_dir = os.path.join(os.getcwd(),"results","<gsdc results directory>")
+    gsdc_state_path = os.path.join(gsdc_dir,"fde_state_<gsdc #>_navdata.csv")
+
+    # timing plots
+    print("timing plots")
+    timing_plots_calculations(simulated_results_path)
+    timing_plots(simulated_results_dir)
+
+    print("eigenvalue plots")
+    # without measurement noise
+    moving_eigenvalues(noise=False)
+    # with measurement noise
+    moving_eigenvalues(noise=True)
+
+    # singular value U matrix
+    print("singular value plot")
+    moving_svd(noise=False)
+
+    # skyplots from simulated data
+    # world_skyplots_check()
+    print("skykplots")
+    world_skyplots()
+
+    print("satellites in view")
+    plot_sats_in_view()
+
+    #accuracy plots
+    # accuracy_plots(simulated_results_path)
+
+    # roc curve
+    print("roc curve")
+    roc_curve(simulated_results_path)
+    print("auc table")
+    auc_table(simulated_results_path)
+
+    # gsdc error plots
     gsdc_error(gsdc_state_path)
 
-    gsdc_timing_path = os.path.join(gsdc_dir,"fde_1360_navdata.csv")
-    # gsdc_timing_plots_calculations(gsdc_timing_path)
+    # gsdc timing plots
+    gsdc_timing_plots_calculations(gsdc_state_path)
     gsdc_timing_plots(gsdc_dir)
-
-
-
-    #
-    # # timing plots
-    # print("timing plots")
-    # timing_plots_calculations(results_path)
-    # timing_plots(results_dir)
-    #
-    # print("eigenvalue plots")
-    # # without measurement noise
-    # moving_eigenvalues(noise=False)
-    # # with measurement noise
-    # moving_eigenvalues(noise=True)
-    #
-    # # singular value U matrix
-    # print("singular value plot")
-    # moving_svd(noise=False)
-    #
-    # # skyplots from simulated data
-    # # world_skyplots_check()
-    # print("skykplots")
-    # world_skyplots()
-    #
-    # print("satellites in view")
-    # plot_sats_in_view()
-    #
-    # #accuracy plots
-    # # accuracy_plots(results_path)
-    #
-    # # roc curve
-    # print("roc curve")
-    # roc_curve(results_path)
-    # print("auc table")
-    # auc_table(results_path)
 
     plt.show()
 
@@ -106,18 +105,18 @@ def create_label(items):
 
     return label
 
-def gsdc_error(results_path):
+def gsdc_error(gsdc_results_path):
     """Plot the state error.
 
     Parameters
     ----------
-    results_path : string
+    gsdc_results_path : string
         Paths to saved state metrics.
 
     """
 
 
-    navdata = glp.NavData(csv_path = results_path)
+    navdata = glp.NavData(csv_path = gsdc_results_path)
     navdata["threshold2"] = np.nan_to_num(navdata["threshold"])
 
     all_score = np.mean(navdata.where("method","all").where("horizontal_50_95",300,"leq")["horizontal_50_95"])
@@ -205,17 +204,17 @@ def gsdc_error(results_path):
     fig.set_layout_engine(layout="tight")
     save_figure(fig,"gsdc_residual_error")
 
-def gsdc_timing_plots_calculations(results_path):
+def gsdc_timing_plots_calculations(gsdc_results_path):
     """Calculations for the timing plots.
 
     Parameters
     ----------
-    results_path : string
+    gsdc_results_path : string
         Paths to saved metrics.
 
     """
 
-    navdata = glp.NavData(csv_path = results_path)
+    navdata = glp.NavData(csv_path = gsdc_results_path)
     # navdata = navdata.copy(cols=list(range(0,22)))
     navdata["glp_label"] = create_label([
                                          navdata["trace"].astype(str),
@@ -244,7 +243,7 @@ def gsdc_timing_plots_calculations(results_path):
 
         file_prefix = [method,trace,phone,threshold]
         file_name = "_".join(file_prefix).replace(".","") + "_navdata.csv"
-        file_path = os.path.join(os.path.dirname(results_path),file_name)
+        file_path = os.path.join(os.path.dirname(gsdc_results_path),file_name)
         print("reading path:",file_path)
         navdata_file = glp.NavData(csv_path=file_path)
 
@@ -269,22 +268,22 @@ def gsdc_timing_plots_calculations(results_path):
             single_navdata["std_compute_time_ms"] = np.std(v)
             measurements_navdata = glp.concat(measurements_navdata,single_navdata)
 
-    measurements_navdata.to_csv(output_path=os.path.join(os.path.dirname(results_path),
+    measurements_navdata.to_csv(output_path=os.path.join(os.path.dirname(gsdc_results_path),
                                                          "gsdc_measurements_timing.csv"))
 
-def gsdc_timing_plots(results_dir):
+def gsdc_timing_plots(gsdc_results_dir):
     """Plot the state error.
 
     Parameters
     ----------
-    results_path : string
+    gsdc_results_path : string
         Paths to saved state metrics.
 
     """
 
 
 
-    measurements_navdata = glp.NavData(csv_path=os.path.join(results_dir,"gsdc_measurements_timing.csv"))
+    measurements_navdata = glp.NavData(csv_path=os.path.join(gsdc_results_dir,"gsdc_measurements_timing.csv"))
 
     glp.sort(measurements_navdata,"measurements",inplace=True)
 
@@ -313,17 +312,17 @@ def gsdc_timing_plots(results_dir):
     plt.xticks(range(25,46,5))
     save_figure(fig,"gsdc_measurements_mean_compute_time_ms")
 
-def roc_curve(results_path):
+def roc_curve(simulated_results_path):
     """Plot the ROC curve.
 
     Parameters
     ----------
-    results_path : string
+    simulated_results_path : string
         Paths to saved metrics.
 
     """
 
-    navdata = glp.NavData(csv_path = results_path)
+    navdata = glp.NavData(csv_path = simulated_results_path)
     navdata["method_and_bias_m"] = np.char.add(np.char.add(navdata["method"].astype(str),"_"),
                                                 navdata["bias"].astype(str))
     navdata.rename({"far":"false_alarm_rate","tpr":"true_positive_rate"},inplace=True)
@@ -361,17 +360,17 @@ def roc_curve(results_path):
         plt.xlim(0.0,0.9)
         plt.ylim(0.0,1.0)
 
-def auc_table(results_path):
+def auc_table(simulated_results_path):
     """Create the AUC table.
 
     Parameters
     ----------
-    results_path : string
+    simulated_results_path : string
         Paths to saved metrics.
 
     """
 
-    navdata = glp.NavData(csv_path = results_path)
+    navdata = glp.NavData(csv_path = simulated_results_path)
     navdata_cropped = glp.concat(navdata.where("bias",60).where("faults",12),navdata.where("bias",10).where("faults",1))
 
     navdata_cropped["glp_label"] = create_label([navdata_cropped["bias"].astype(str),
@@ -413,17 +412,17 @@ def auc_table(results_path):
     navdata_auc["edm_wins"] = navdata_auc["edm_auc"] > navdata_auc["residual_auc"]
     print(navdata_auc)
 
-def timing_plots_calculations(results_path):
+def timing_plots_calculations(simulated_results_path):
     """Calculations for the timing plots.
 
     Parameters
     ----------
-    results_path : string
+    simulated_results_path : string
         Paths to saved metrics.
 
     """
 
-    navdata = glp.NavData(csv_path = results_path)
+    navdata = glp.NavData(csv_path = simulated_results_path)
     navdata["glp_label"] = create_label([navdata["faults"].astype(str),
                                          navdata["bias"].astype(str),
                                          navdata["location_name"].astype(str),
@@ -455,7 +454,7 @@ def timing_plots_calculations(results_path):
         file_prefix = [method,location_name,str(faults),str(bias),
                        threshold]
         file_name = "_".join(file_prefix).replace(".","") + "_navdata.csv"
-        file_path = os.path.join(os.path.dirname(results_path),file_name)
+        file_path = os.path.join(os.path.dirname(simulated_results_path),file_name)
         navdata_file = glp.NavData(csv_path=file_path)
 
         for _, _, navdata_subset in glp.loop_time(navdata_file,"gps_millis"):
@@ -500,23 +499,23 @@ def timing_plots_calculations(results_path):
             single_navdata["std_compute_time_ms"] = np.std(v)
             measurements_navdata = glp.concat(measurements_navdata,single_navdata)
 
-    measurements_navdata.to_csv(output_path=os.path.join(os.path.dirname(results_path),
+    measurements_navdata.to_csv(output_path=os.path.join(os.path.dirname(simulated_results_path),
                                                          "measurements_timing.csv"))
-    faults_navdata.to_csv(output_path=os.path.join(os.path.dirname(results_path),
+    faults_navdata.to_csv(output_path=os.path.join(os.path.dirname(simulated_results_path),
                                                          "faults_timing.csv"))
 
-def timing_plots(results_dir):
+def timing_plots(simulated_results_dir):
     """Plot timing info.
 
     Parameters
     ----------
-    results_dir : string
+    simulated_results_dir : string
         Directory to saved metrics.
 
     """
 
-    faults_navdata = glp.NavData(csv_path=os.path.join(results_dir,"faults_timing.csv"))
-    measurements_navdata = glp.NavData(csv_path=os.path.join(results_dir,"measurements_timing.csv"))
+    faults_navdata = glp.NavData(csv_path=os.path.join(simulated_results_dir,"faults_timing.csv"))
+    measurements_navdata = glp.NavData(csv_path=os.path.join(simulated_results_dir,"measurements_timing.csv"))
 
     glp.sort(faults_navdata,"faults",inplace=True)
     glp.sort(measurements_navdata,"measurements",inplace=True)
@@ -548,17 +547,17 @@ def timing_plots(results_dir):
         plt.yscale("log")
         save_figure(fig,graph_type+"_"+"mean_compute_time_ms")
 
-def accuracy_plots(results_path):
+def accuracy_plots(simulated_results_path):
     """Create accuracy plots.
 
     Parameters
     ----------
-    results_path : string
+    simulated_results_path : string
         Paths to saved metrics.
 
     """
 
-    navdata = glp.NavData(csv_path = results_path)
+    navdata = glp.NavData(csv_path = simulated_results_path)
     edm_navdata = navdata.where("method","edm")
     r_navdata = navdata.where("method","residual")
 
