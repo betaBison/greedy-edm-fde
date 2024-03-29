@@ -14,6 +14,7 @@ import matplotlib.pyplot as plt
 import gnss_lib_py as glp
 from gnss_lib_py.algorithms.fde import _edm_from_satellites_ranges
 from gnss_lib_py.visualizations.style import save_figure
+from gnss_lib_py.visualizations.plot_metric import  _get_new_fig
 
 np.random.seed(314)
 
@@ -32,13 +33,16 @@ locations = {
 def main():
 
     # update results directory and result file name here
-    results_dir = os.path.join(os.getcwd(),"results","<results directory>")
-    results_path = os.path.join(results_dir,"fde_11880_navdata.csv")
+    simulated_results_dir = os.path.join(os.getcwd(),"results","<simulated results directory>")
+    simulated_results_path = os.path.join(simulated_results_dir,"fde_<simulated #>_navdata.csv")
+
+    gsdc_dir = os.path.join(os.getcwd(),"results","<gsdc results directory>")
+    gsdc_state_path = os.path.join(gsdc_dir,"fde_state_<gsdc #>_navdata.csv")
 
     # timing plots
     print("timing plots")
-    timing_plots_calculations(results_path)
-    timing_plots(results_dir)
+    timing_plots_calculations(simulated_results_path)
+    timing_plots(simulated_results_dir)
 
     print("eigenvalue plots")
     # without measurement noise
@@ -59,13 +63,20 @@ def main():
     plot_sats_in_view()
 
     #accuracy plots
-    # accuracy_plots(results_path)
+    # accuracy_plots(simulated_results_path)
 
     # roc curve
     print("roc curve")
-    roc_curve(results_path)
+    roc_curve(simulated_results_path)
     print("auc table")
-    auc_table(results_path)
+    auc_table(simulated_results_path)
+
+    # gsdc error plots
+    gsdc_error(gsdc_state_path)
+
+    # gsdc timing plots
+    gsdc_timing_plots_calculations(gsdc_state_path)
+    gsdc_timing_plots(gsdc_dir)
 
     plt.show()
 
@@ -94,17 +105,224 @@ def create_label(items):
 
     return label
 
-def roc_curve(results_path):
-    """Plot the ROC curve.
+def gsdc_error(gsdc_results_path):
+    """Plot the state error.
 
     Parameters
     ----------
-    results_path : string
+    gsdc_results_path : string
+        Paths to saved state metrics.
+
+    """
+
+
+    navdata = glp.NavData(csv_path = gsdc_results_path)
+    navdata["threshold2"] = np.nan_to_num(navdata["threshold"])
+
+    all_score = np.mean(navdata.where("method","all").where("horizontal_50_95",300,"leq")["horizontal_50_95"])
+    nonfaulty_score = np.mean(navdata.where("method","gt_nonfaulty").where("horizontal_50_95",300,"leq")["horizontal_50_95"])
+    fig = glp.plot_metric(navdata.where("method",("all","gt_nonfaulty")).where("horizontal_50_95",300,"leq"),
+                          "threshold2",
+                          "horizontal_50_95",
+                           groupby="method",
+                           linestyle="none",
+                           # avg_y = True,
+                          )
+
+    fig = glp.plot_metric(navdata.where("method","edm").where("threshold",(0.40,0.7),"neq"),
+                          "threshold",
+                          "horizontal_50_95",
+                           groupby="method",
+                           linestyle="none",
+                           avg_y = True,
+                           save=True,
+                           markersize=10,
+                           color="C0",
+                           title="MEAN OF 50th & 95th PERCENTILE ERRORS",
+                          )
+    plt.plot([0.,1.],[nonfaulty_score,nonfaulty_score],
+            linewidth=5.0,
+            marker=",",
+            markersize=0,
+            linestyle="dotted",
+            color="C2",
+            label='"MULTIPATH" REMOVED',
+            )
+    plt.plot([0.,1.],[all_score,all_score],
+            linewidth=5.0,
+            marker=",",
+            markersize=0,
+            color="C3",
+            label="ALL MEASUREMENTS",
+            )
+
+    plt.ylim(4,10)
+    plt.xlim(0.40,0.7)
+    plt.ylabel("HORIZONTAL DISTANCE ERROR")
+    plt.legend(loc="upper left", bbox_to_anchor=(1.05, 1),
+                   title="METHOD")
+    fig.set_layout_engine(layout="tight")
+    save_figure(fig,"gsdc_edm_error")
+
+
+
+    fig = glp.plot_metric(navdata.where("method","residual"),
+                          "threshold",
+                          "horizontal_50_95",
+                           groupby="method",
+                           linestyle="none",
+                           avg_y = True,
+                           save=True,
+                           color="C1",
+                           marker="*",
+                           markersize=10,
+                           title="MEAN OF 50th & 95th PERCENTILE ERRORS",
+                          )
+
+    plt.plot([0.1,10E6],[nonfaulty_score,nonfaulty_score],
+            linewidth=5.0,
+            linestyle="dotted",
+            marker=",",
+            markersize=0,
+            label='"MULTIPATH" REMOVED',
+            color="C2"
+            )
+    plt.plot([0.1,10E6],[all_score,all_score],
+            linewidth=5.0,
+            marker=",",
+            markersize=0,
+            label="ALL MEASUREMENTS",
+            color="C3"
+            )
+    plt.ylabel("HORIZONTAL DISTANCE ERROR")
+    plt.legend(loc="upper left", bbox_to_anchor=(1.05, 1),
+                   title="METHOD")
+
+    plt.xscale("log")
+    plt.ylim(4,10)
+    plt.xlim(3,3E5)
+    fig.set_layout_engine(layout="tight")
+    save_figure(fig,"gsdc_residual_error")
+
+def gsdc_timing_plots_calculations(gsdc_results_path):
+    """Calculations for the timing plots.
+
+    Parameters
+    ----------
+    gsdc_results_path : string
         Paths to saved metrics.
 
     """
 
-    navdata = glp.NavData(csv_path = results_path)
+    navdata = glp.NavData(csv_path = gsdc_results_path)
+    # navdata = navdata.copy(cols=list(range(0,22)))
+    navdata["glp_label"] = create_label([
+                                         navdata["trace"].astype(str),
+                                         navdata["phone"].astype(str),
+                                         navdata["method"].astype(str),
+                                         ])
+    timing_measurements = {}
+    methods = ("edm","residual")
+    for method in methods:
+        timing_measurements[method] = {}
+
+    for glp_label in np.unique(navdata["glp_label"]):
+        print("calculating timing for:",glp_label)
+        navdata_cropped = navdata.where("glp_label",glp_label)
+        row_idx = np.argmin(navdata_cropped["horizontal_50_95"])
+        method = navdata_cropped["method",row_idx].item()
+        trace = navdata_cropped["trace",row_idx].item()
+        phone = navdata_cropped["phone",row_idx].item()
+        threshold = navdata_cropped["threshold",row_idx].item()
+        if threshold == 0:
+            threshold = str(int(threshold)).zfill(4)
+        elif threshold < 1:
+            threshold = str(np.round(threshold,4)).zfill(4)
+        else:
+            threshold = str(int(threshold)).zfill(4)
+
+        file_prefix = [method,trace,phone,threshold]
+        file_name = "_".join(file_prefix).replace(".","") + "_navdata.csv"
+        file_path = os.path.join(os.path.dirname(gsdc_results_path),file_name)
+        print("reading path:",file_path)
+        navdata_file = glp.NavData(csv_path=file_path)
+
+        for _, _, navdata_subset in glp.loop_time(navdata_file,"gps_millis"):
+            compute_time_ms = navdata_subset["compute_time_s",0]*1000
+            num_measurements = len(navdata_subset)
+            if num_measurements not in timing_measurements[method]:
+                timing_measurements[method][num_measurements] = [compute_time_ms]
+            else:
+                timing_measurements[method][num_measurements].append(compute_time_ms)
+
+    measurements_navdata = glp.NavData()
+    for method in methods:
+        for k,v in timing_measurements[method].items():
+            single_navdata = glp.NavData()
+            single_navdata["method"] = np.array([method])
+            single_navdata["measurements"] = k
+            single_navdata["mean_compute_time_ms"] = np.mean(v)
+            single_navdata["min_compute_time_ms"] = np.min(v)
+            single_navdata["max_compute_time_ms"] = np.max(v)
+            single_navdata["median_compute_time_ms"] = np.median(v)
+            single_navdata["std_compute_time_ms"] = np.std(v)
+            measurements_navdata = glp.concat(measurements_navdata,single_navdata)
+
+    measurements_navdata.to_csv(output_path=os.path.join(os.path.dirname(gsdc_results_path),
+                                                         "gsdc_measurements_timing.csv"))
+
+def gsdc_timing_plots(gsdc_results_dir):
+    """Plot the state error.
+
+    Parameters
+    ----------
+    gsdc_results_path : string
+        Paths to saved state metrics.
+
+    """
+
+
+
+    measurements_navdata = glp.NavData(csv_path=os.path.join(gsdc_results_dir,"gsdc_measurements_timing.csv"))
+
+    glp.sort(measurements_navdata,"measurements",inplace=True)
+
+    navdata_plot = measurements_navdata.where("measurements",25,"geq").where("measurements",45,"leq")
+
+    fig = glp.plot_metric(navdata_plot,
+                    "measurements","mean_compute_time_ms",
+                    groupby="method",
+                    save=False,
+                    linewidth=5.0,
+                    markersize=10,
+                    linestyle="None",
+                    )
+
+    plt.gca().set_prop_cycle(None)
+    for method in ["edm","residual"]:
+        navdata_std = navdata_plot.where("method",method)
+        # print(navdata_std[graph_type])
+        if len(navdata_std) > 1:
+            plt.fill_between(navdata_std["measurements"],
+                             navdata_std["mean_compute_time_ms"] - 1*navdata_std["std_compute_time_ms"],
+                             navdata_std["mean_compute_time_ms"] + 1*navdata_std["std_compute_time_ms"],
+                             alpha=0.5)
+    plt.yscale("log")
+    plt.xlim(24,46)
+    plt.xticks(range(25,46,5))
+    save_figure(fig,"gsdc_measurements_mean_compute_time_ms")
+
+def roc_curve(simulated_results_path):
+    """Plot the ROC curve.
+
+    Parameters
+    ----------
+    simulated_results_path : string
+        Paths to saved metrics.
+
+    """
+
+    navdata = glp.NavData(csv_path = simulated_results_path)
     navdata["method_and_bias_m"] = np.char.add(np.char.add(navdata["method"].astype(str),"_"),
                                                 navdata["bias"].astype(str))
     navdata.rename({"far":"false_alarm_rate","tpr":"true_positive_rate"},inplace=True)
@@ -142,17 +360,17 @@ def roc_curve(results_path):
         plt.xlim(0.0,0.9)
         plt.ylim(0.0,1.0)
 
-def auc_table(results_path):
+def auc_table(simulated_results_path):
     """Create the AUC table.
 
     Parameters
     ----------
-    results_path : string
+    simulated_results_path : string
         Paths to saved metrics.
 
     """
 
-    navdata = glp.NavData(csv_path = results_path)
+    navdata = glp.NavData(csv_path = simulated_results_path)
     navdata_cropped = glp.concat(navdata.where("bias",60).where("faults",12),navdata.where("bias",10).where("faults",1))
 
     navdata_cropped["glp_label"] = create_label([navdata_cropped["bias"].astype(str),
@@ -194,17 +412,17 @@ def auc_table(results_path):
     navdata_auc["edm_wins"] = navdata_auc["edm_auc"] > navdata_auc["residual_auc"]
     print(navdata_auc)
 
-def timing_plots_calculations(results_path):
+def timing_plots_calculations(simulated_results_path):
     """Calculations for the timing plots.
 
     Parameters
     ----------
-    results_path : string
+    simulated_results_path : string
         Paths to saved metrics.
 
     """
 
-    navdata = glp.NavData(csv_path = results_path)
+    navdata = glp.NavData(csv_path = simulated_results_path)
     navdata["glp_label"] = create_label([navdata["faults"].astype(str),
                                          navdata["bias"].astype(str),
                                          navdata["location_name"].astype(str),
@@ -236,7 +454,7 @@ def timing_plots_calculations(results_path):
         file_prefix = [method,location_name,str(faults),str(bias),
                        threshold]
         file_name = "_".join(file_prefix).replace(".","") + "_navdata.csv"
-        file_path = os.path.join(os.path.dirname(results_path),file_name)
+        file_path = os.path.join(os.path.dirname(simulated_results_path),file_name)
         navdata_file = glp.NavData(csv_path=file_path)
 
         for _, _, navdata_subset in glp.loop_time(navdata_file,"gps_millis"):
@@ -281,23 +499,23 @@ def timing_plots_calculations(results_path):
             single_navdata["std_compute_time_ms"] = np.std(v)
             measurements_navdata = glp.concat(measurements_navdata,single_navdata)
 
-    measurements_navdata.to_csv(output_path=os.path.join(os.path.dirname(results_path),
+    measurements_navdata.to_csv(output_path=os.path.join(os.path.dirname(simulated_results_path),
                                                          "measurements_timing.csv"))
-    faults_navdata.to_csv(output_path=os.path.join(os.path.dirname(results_path),
+    faults_navdata.to_csv(output_path=os.path.join(os.path.dirname(simulated_results_path),
                                                          "faults_timing.csv"))
 
-def timing_plots(results_dir):
+def timing_plots(simulated_results_dir):
     """Plot timing info.
 
     Parameters
     ----------
-    results_dir : string
+    simulated_results_dir : string
         Directory to saved metrics.
 
     """
 
-    faults_navdata = glp.NavData(csv_path=os.path.join(results_dir,"faults_timing.csv"))
-    measurements_navdata = glp.NavData(csv_path=os.path.join(results_dir,"measurements_timing.csv"))
+    faults_navdata = glp.NavData(csv_path=os.path.join(simulated_results_dir,"faults_timing.csv"))
+    measurements_navdata = glp.NavData(csv_path=os.path.join(simulated_results_dir,"measurements_timing.csv"))
 
     glp.sort(faults_navdata,"faults",inplace=True)
     glp.sort(measurements_navdata,"measurements",inplace=True)
@@ -329,17 +547,17 @@ def timing_plots(results_dir):
         plt.yscale("log")
         save_figure(fig,graph_type+"_"+"mean_compute_time_ms")
 
-def accuracy_plots(results_path):
+def accuracy_plots(simulated_results_path):
     """Create accuracy plots.
 
     Parameters
     ----------
-    results_path : string
+    simulated_results_path : string
         Paths to saved metrics.
 
     """
 
-    navdata = glp.NavData(csv_path = results_path)
+    navdata = glp.NavData(csv_path = simulated_results_path)
     edm_navdata = navdata.where("method","edm")
     r_navdata = navdata.where("method","residual")
 
