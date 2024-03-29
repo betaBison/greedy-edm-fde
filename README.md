@@ -1,6 +1,6 @@
 # Greedy EDM FDE
 
-This repository contains code for Euclidean Distance Matrix-based Fault Detection and Exclusion (FDE) based on the paper "Detection and Exclusion of Multiple Faults using Euclidean Distance Matrices" by Derek Knowles and Grace Gao from the ION GNSS+ 2023 conference.
+This repository contains code for Greedy Euclidean Distance Matrix-based Fault Detection and Exclusion (FDE) based on the paper "Greedy Detection and Exclusion of Multiple Faults using Euclidean Distance Matrices" by Derek Knowles and Grace Gao from the ION GNSS+ 2023 conference.
 
 Tutorials on how to run EDM FDE using the ``gnss_lib_py`` library can be
 found on the ``gnss_lib_py`` [documentation website](https://gnss-lib-py.readthedocs.io/en/latest/tutorials/algorithms/tutorials_fde_notebook.html).
@@ -35,9 +35,8 @@ Challenge 2023](https://www.kaggle.com/competitions/smartphone-decimeter-2023) d
 ```
 python3 fde_gsdc.py
 ```
-3. Create presentation figures by editing the ``<simulated results directory>``,
-``<simulated #>``, `<gsdc results directory>``,
-``<gsdc #>``, in ``presentation_figures.py`` then running the file.
+4. Create presentation figures by editing the ``<simulated results directory>``,
+``<simulated #>``, ``<gsdc results directory>``, and ``<gsdc #>`` variables in ``presentation_figures.py`` then running the file:
 ```
 python3 presentation_figures.py
 ```
