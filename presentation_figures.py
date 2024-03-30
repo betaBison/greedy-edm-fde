@@ -33,8 +33,10 @@ locations = {
 def main():
 
     # update results directory and result file name here
-    simulated_results_dir = os.path.join(os.getcwd(),"results","<simulated results directory>")
-    simulated_results_path = os.path.join(simulated_results_dir,"fde_<simulated #>_navdata.csv")
+    # simulated_results_dir = os.path.join(os.getcwd(),"results","<simulated results directory>")
+    # simulated_results_path = os.path.join(simulated_results_dir,"fde_<simulated #>_navdata.csv")
+    simulated_results_dir = os.path.join(os.getcwd(),"results","20240329173438")
+    simulated_results_path = os.path.join(simulated_results_dir,"fde_16200_navdata.csv")
 
     gsdc_dir = os.path.join(os.getcwd(),"results","<gsdc results directory>")
     gsdc_state_path = os.path.join(gsdc_dir,"fde_state_<gsdc #>_navdata.csv")
@@ -44,23 +46,23 @@ def main():
     timing_plots_calculations(simulated_results_path)
     timing_plots(simulated_results_dir)
 
-    print("eigenvalue plots")
-    # without measurement noise
-    moving_eigenvalues(noise=False)
-    # with measurement noise
-    moving_eigenvalues(noise=True)
-
-    # singular value U matrix
-    print("singular value plot")
-    moving_svd(noise=False)
-
-    # skyplots from simulated data
-    # world_skyplots_check()
-    print("skykplots")
-    world_skyplots()
-
-    print("satellites in view")
-    plot_sats_in_view()
+    # print("eigenvalue plots")
+    # # without measurement noise
+    # moving_eigenvalues(noise=False)
+    # # with measurement noise
+    # moving_eigenvalues(noise=True)
+    #
+    # # singular value U matrix
+    # print("singular value plot")
+    # moving_svd(noise=False)
+    #
+    # # skyplots from simulated data
+    # # world_skyplots_check()
+    # print("skykplots")
+    # world_skyplots()
+    #
+    # print("satellites in view")
+    # plot_sats_in_view()
 
     #accuracy plots
     # accuracy_plots(simulated_results_path)
@@ -71,12 +73,12 @@ def main():
     print("auc table")
     auc_table(simulated_results_path)
 
-    # gsdc error plots
-    gsdc_error(gsdc_state_path)
-
-    # gsdc timing plots
-    gsdc_timing_plots_calculations(gsdc_state_path)
-    gsdc_timing_plots(gsdc_dir)
+    # # gsdc error plots
+    # gsdc_error(gsdc_state_path)
+    #
+    # # gsdc timing plots
+    # gsdc_timing_plots_calculations(gsdc_state_path)
+    # gsdc_timing_plots(gsdc_dir)
 
     plt.show()
 
@@ -94,7 +96,6 @@ def create_label(items):
         Label to use for combined data.
 
     """
-
 
     if len(items) == 1:
         return items
@@ -222,7 +223,7 @@ def gsdc_timing_plots_calculations(gsdc_results_path):
                                          navdata["method"].astype(str),
                                          ])
     timing_measurements = {}
-    methods = ("edm","residual")
+    methods = ("edm","residual","edm_2021")
     for method in methods:
         timing_measurements[method] = {}
 
@@ -299,7 +300,7 @@ def gsdc_timing_plots(gsdc_results_dir):
                     )
 
     plt.gca().set_prop_cycle(None)
-    for method in ["edm","residual"]:
+    for method in ["edm","edm_2021","residual"]:
         navdata_std = navdata_plot.where("method",method)
         # print(navdata_std[graph_type])
         if len(navdata_std) > 1:
@@ -338,11 +339,9 @@ def roc_curve(simulated_results_path):
                         groupby="method_and_bias_m",
                         save=False,
                         avg_y=True,
-                        linewidth=5.0,
-                        markersize=10,
+                        linewidth=3.0,
+                        markersize=6,
                         )
-        plt.xlim(0.0,0.9)
-        plt.ylim(0.0,1.0)
 
         plt.gca().set_prop_cycle(None)
         glp.plot_metric(navdata.where("glp_label",glp_label).where("method","residual"),
@@ -352,9 +351,22 @@ def roc_curve(simulated_results_path):
                         save=True,
                         title="",
                         prefix="roc_curve",
-                        linewidth=5.0,
-                        markersize=10,
+                        linewidth=3.0,
+                        markersize=6,
                         linestyle="dotted",
+                        fig=fig,
+                        )
+        plt.gca().set_prop_cycle(None)
+        glp.plot_metric(navdata.where("glp_label",glp_label).where("method","edm_2021"),
+                        "false_alarm_rate","true_positive_rate",
+                        groupby="method_and_bias_m",
+                        avg_y=True,
+                        save=True,
+                        title="",
+                        prefix="roc_curve",
+                        linewidth=3.0,
+                        markersize=6,
+                        linestyle="--",
                         fig=fig,
                         )
         plt.xlim(0.0,0.9)
@@ -387,17 +399,17 @@ def auc_table(simulated_results_path):
         label_navdata["faults"] = np.array([navdata_method_bias["faults",0]])
 
         for method in np.unique(navdata_cropped["method"]):
-
             far = navdata_method_bias.where("method",method)["far"]
             tpr = navdata_method_bias.where("method",method)["tpr"]
             far_sort = np.argsort(far)
             far = far[far_sort]
             tpr = tpr[far_sort]
-            interp_value = 0.7
-            interp_point = np.interp(0.7,far,tpr)
+            if min(far) < 0.7 and max(far) > 0.7:
+                interp_value = 0.7
+                interp_point = np.interp(0.7,far,tpr)
 
-            tpr = tpr[far<interp_value].tolist() + [interp_point]
-            far = far[far<interp_value].tolist() + [interp_value]
+                tpr = tpr[far<interp_value].tolist() + [interp_point]
+                far = far[far<interp_value].tolist() + [interp_value]
 
             auc = sk.auc(far,tpr)
 
@@ -430,7 +442,7 @@ def timing_plots_calculations(simulated_results_path):
                                          ])
     timing_measurements = {}
     timing_faults = {}
-    methods = ("edm","residual")
+    methods = ("edm","residual","edm_2021")
     for method in methods:
         timing_faults[method] = {}
         timing_measurements[method] = {}
@@ -536,7 +548,7 @@ def timing_plots(simulated_results_dir):
                         )
 
         plt.gca().set_prop_cycle(None)
-        for method in ["edm","residual"]:
+        for method in ["edm","edm_2021","residual"]:
             navdata_std = navdata_plot.where("method",method)
             # print(navdata_std[graph_type])
             if len(navdata_std) > 1:

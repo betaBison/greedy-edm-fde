@@ -17,6 +17,7 @@ np.random.seed(314)
 
 # methods and thresholds to test
 METHODS = {
+            "edm_2021" : [0.,0.3,1,3,10,30,100,300],
             "edm" : [0,0.5,0.54,0.56,0.566,0.568,0.57,0.572,0.574,0.58,0.6],
             "residual" : [0,50,250,500,1000,2000,3000,4000,5000,10000,100000],
            }
@@ -78,6 +79,7 @@ def location_fde(csv_path):
             print(location_name,"bias:",bias_value)
 
             full_data = full_data_original.copy()
+            # full_data = full_data.where("gps_millis",list(np.unique(full_data["gps_millis"])[:10]))
 
             i = 0
             fault_gt = []
@@ -116,7 +118,6 @@ def location_fde(csv_path):
                 print(location_name,"method:",method)
                 for threshold in thresholds:
                     print(location_name,"threshold:",threshold)
-
                     input_navdata = full_data.copy()
                     metrics, navdata = glp.evaluate_fde(input_navdata,method=method,
                                                         threshold=threshold,
