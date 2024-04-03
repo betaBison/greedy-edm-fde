@@ -63,8 +63,8 @@ def main():
     print("satellites in view")
     plot_sats_in_view()
 
-    # accuracy plots
-    accuracy_plots(simulated_results_path)
+    #accuracy plots
+    # accuracy_plots(simulated_results_path)
 
     # roc curve
     print("roc curve")
@@ -396,7 +396,6 @@ def gsdc_timing_plots(gsdc_results_dir):
                         linestyle="None",
                         fig = fig,
                         )
-    # print(navdata_std[graph_type])
         if len(navdata_std) > 1:
             plt.fill_between(navdata_std["measurements"],
                              navdata_std["mean_compute_time_ms"] - 1*navdata_std["std_compute_time_ms"],
@@ -537,7 +536,8 @@ def timing_plots_calculations(simulated_results_path):
                                          ])
     timing_measurements = {}
     timing_faults = {}
-    methods = ("edm","residual","edm_2021")
+    # methods = ("edm","residual","edm_2021")
+    methods = ("edm","residual")
     for method in methods:
         timing_faults[method] = {}
         timing_measurements[method] = {}
