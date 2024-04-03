@@ -33,39 +33,38 @@ locations = {
 def main():
 
     # update results directory and result file name here
-    # simulated_results_dir = os.path.join(os.getcwd(),"results","<simulated results directory>")
-    # simulated_results_path = os.path.join(simulated_results_dir,"fde_<simulated #>_navdata.csv")
-    simulated_results_dir = os.path.join(os.getcwd(),"results","20240329173438")
-    simulated_results_path = os.path.join(simulated_results_dir,"fde_16200_navdata.csv")
+    simulated_results_dir = os.path.join(os.getcwd(),"results","<simulated results directory>")
+    simulated_results_path = os.path.join(simulated_results_dir,"fde_<simulated #>_navdata.csv")
 
     gsdc_dir = os.path.join(os.getcwd(),"results","<gsdc results directory>")
     gsdc_state_path = os.path.join(gsdc_dir,"fde_state_<gsdc #>_navdata.csv")
+    gsdc_timing_path = os.path.join(gsdc_dir,"fde_<gsdc #>_navdata.csv")
 
     # timing plots
     print("timing plots")
     timing_plots_calculations(simulated_results_path)
     timing_plots(simulated_results_dir)
 
-    # print("eigenvalue plots")
-    # # without measurement noise
-    # moving_eigenvalues(noise=False)
-    # # with measurement noise
-    # moving_eigenvalues(noise=True)
-    #
-    # # singular value U matrix
-    # print("singular value plot")
-    # moving_svd(noise=False)
-    #
-    # # skyplots from simulated data
-    # # world_skyplots_check()
-    # print("skykplots")
-    # world_skyplots()
-    #
-    # print("satellites in view")
-    # plot_sats_in_view()
+    print("eigenvalue plots")
+    # without measurement noise
+    moving_eigenvalues(noise=False)
+    # with measurement noise
+    moving_eigenvalues(noise=True)
 
-    #accuracy plots
-    # accuracy_plots(simulated_results_path)
+    # singular value U matrix
+    print("singular value plot")
+    moving_svd(noise=False)
+
+    # skyplots from simulated data
+    # world_skyplots_check()
+    print("skykplots")
+    world_skyplots()
+
+    print("satellites in view")
+    plot_sats_in_view()
+
+    # accuracy plots
+    accuracy_plots(simulated_results_path)
 
     # roc curve
     print("roc curve")
@@ -73,12 +72,12 @@ def main():
     print("auc table")
     auc_table(simulated_results_path)
 
-    # # gsdc error plots
-    # gsdc_error(gsdc_state_path)
-    #
-    # # gsdc timing plots
-    # gsdc_timing_plots_calculations(gsdc_state_path)
-    # gsdc_timing_plots(gsdc_dir)
+    # gsdc error plots
+    gsdc_error(gsdc_state_path)
+
+    # gsdc timing plots
+    gsdc_timing_plots_calculations(gsdc_timing_path)
+    gsdc_timing_plots(gsdc_dir)
 
     plt.show()
 
@@ -122,13 +121,9 @@ def gsdc_error(gsdc_results_path):
 
     all_score = np.mean(navdata.where("method","all").where("horizontal_50_95",300,"leq")["horizontal_50_95"])
     nonfaulty_score = np.mean(navdata.where("method","gt_nonfaulty").where("horizontal_50_95",300,"leq")["horizontal_50_95"])
-    fig = glp.plot_metric(navdata.where("method",("all","gt_nonfaulty")).where("horizontal_50_95",300,"leq"),
-                          "threshold2",
-                          "horizontal_50_95",
-                           groupby="method",
-                           linestyle="none",
-                           # avg_y = True,
-                          )
+    min_edm = np.mean(navdata.where("method","edm").where("threshold",0.55)["horizontal_50_95"])
+    min_edm_2021 = np.mean(navdata.where("method","edm_2021").where("threshold",3)["horizontal_50_95"])
+    min_residual = np.mean(navdata.where("method","residual").where("threshold",300)["horizontal_50_95"])
 
     fig = glp.plot_metric(navdata.where("method","edm").where("threshold",(0.40,0.7),"neq"),
                           "threshold",
@@ -139,25 +134,43 @@ def gsdc_error(gsdc_results_path):
                            save=True,
                            markersize=10,
                            color="C0",
+                           zorder=9,
                            title="MEAN OF 50th & 95th PERCENTILE ERRORS",
                           )
-    plt.plot([0.,1.],[nonfaulty_score,nonfaulty_score],
-            linewidth=5.0,
+    plt.plot([0,1],[min_residual,min_residual],
+            linewidth=3.0,
+            linestyle="solid",
             marker=",",
             markersize=0,
-            linestyle="dotted",
-            color="C2",
-            label='"MULTIPATH" REMOVED',
+            label="RESIDUAL MINIMUM",
+            color="C1"
+            )
+    plt.plot([0,1],[min_edm_2021,min_edm_2021],
+            linewidth=3.0,
+            linestyle="dashed",
+            marker=",",
+            markersize=0,
+            label="EDM 2021 MINIMUM",
+            color="C2"
             )
     plt.plot([0.,1.],[all_score,all_score],
-            linewidth=5.0,
+            linewidth=3.0,
+            linestyle="dotted",
             marker=",",
             markersize=0,
             color="C3",
             label="ALL MEASUREMENTS",
             )
+    plt.plot([0.,1.],[nonfaulty_score,nonfaulty_score],
+            linewidth=3.0,
+            linestyle="dashdot",
+            marker=",",
+            markersize=0,
+            color="C4",
+            label='"MULTIPATH" REMOVED',
+            )
 
-    plt.ylim(4,10)
+    plt.ylim(4,12)
     plt.xlim(0.40,0.7)
     plt.ylabel("HORIZONTAL DISTANCE ERROR")
     plt.legend(loc="upper left", bbox_to_anchor=(1.05, 1),
@@ -166,7 +179,15 @@ def gsdc_error(gsdc_results_path):
     save_figure(fig,"gsdc_edm_error")
 
 
-
+    fig = plt.figure()
+    plt.plot([0.1,10E6],[min_edm,min_edm],
+            linewidth=3.0,
+            linestyle="dashed",
+            marker=",",
+            markersize=0,
+            label="EDM MINIMUM",
+            color="C0"
+            )
     fig = glp.plot_metric(navdata.where("method","residual"),
                           "threshold",
                           "horizontal_50_95",
@@ -177,33 +198,104 @@ def gsdc_error(gsdc_results_path):
                            color="C1",
                            marker="*",
                            markersize=10,
+                           fig=fig,
+                           zorder=9,
                            title="MEAN OF 50th & 95th PERCENTILE ERRORS",
                           )
-
-    plt.plot([0.1,10E6],[nonfaulty_score,nonfaulty_score],
-            linewidth=5.0,
-            linestyle="dotted",
+    plt.plot([0.1,10E6],[min_edm_2021,min_edm_2021],
+            linewidth=3.0,
+            linestyle="solid",
             marker=",",
             markersize=0,
-            label='"MULTIPATH" REMOVED',
+            label="EDM 2021 MINIMUM",
             color="C2"
             )
     plt.plot([0.1,10E6],[all_score,all_score],
-            linewidth=5.0,
+            linewidth=3.0,
+            linestyle="dotted",
             marker=",",
             markersize=0,
             label="ALL MEASUREMENTS",
             color="C3"
             )
+    plt.plot([0.1,10E6],[nonfaulty_score,nonfaulty_score],
+            linewidth=3.0,
+            linestyle="dashdot",
+            marker=",",
+            markersize=0,
+            label='"MULTIPATH" REMOVED',
+            color="C4"
+            )
+
     plt.ylabel("HORIZONTAL DISTANCE ERROR")
     plt.legend(loc="upper left", bbox_to_anchor=(1.05, 1),
                    title="METHOD")
 
     plt.xscale("log")
-    plt.ylim(4,10)
+    plt.ylim(4,12)
     plt.xlim(3,3E5)
     fig.set_layout_engine(layout="tight")
     save_figure(fig,"gsdc_residual_error")
+
+    fig = plt.figure()
+    plt.plot([-100,600],[min_edm,min_edm],
+            linewidth=3.0,
+            linestyle="dashed",
+            marker=",",
+            markersize=0,
+            label="EDM MINIMUM",
+            color="C0"
+            )
+    plt.plot([-100,600],[min_residual,min_residual],
+            linewidth=3.0,
+            linestyle="solid",
+            marker=",",
+            markersize=0,
+            label="RESIDUAL MINIMUM",
+            color="C1"
+            )
+    fig = glp.plot_metric(navdata.where("method","edm_2021"),
+                          "threshold",
+                          "horizontal_50_95",
+                           groupby="method",
+                           linestyle="none",
+                           avg_y = True,
+                           save=True,
+                           color="C2",
+                           marker="P",
+                           markersize=10,
+                           fig = fig,
+                           zorder=9,
+                           title="MEAN OF 50th & 95th PERCENTILE ERRORS",
+                          )
+    plt.plot([-100,600],[all_score,all_score],
+            linewidth=3.0,
+            linestyle="dotted",
+            marker=",",
+            markersize=0,
+            label="ALL MEASUREMENTS",
+            color="C3"
+            )
+    plt.plot([-100,600],[nonfaulty_score,nonfaulty_score],
+            linewidth=3.0,
+            linestyle="dashdot",
+            marker=",",
+            markersize=0,
+            label='"MULTIPATH" REMOVED',
+            color="C4"
+            )
+
+    plt.ylabel("HORIZONTAL DISTANCE ERROR")
+    plt.legend(loc="upper left", bbox_to_anchor=(1.05, 1),
+                   title="METHOD")
+
+    plt.xscale("log")
+    plt.xlim(0.1,500)
+    plt.ylim(4,12)
+    # plt.xlim(,350)
+    # plt.xticks(range(0,300,100))
+    fig.set_layout_engine(layout="tight")
+    save_figure(fig,"gsdc_edm_2021_error")
 
 def gsdc_timing_plots_calculations(gsdc_results_path):
     """Calculations for the timing plots.
@@ -290,19 +382,21 @@ def gsdc_timing_plots(gsdc_results_dir):
 
     navdata_plot = measurements_navdata.where("measurements",25,"geq").where("measurements",45,"leq")
 
-    fig = glp.plot_metric(navdata_plot,
-                    "measurements","mean_compute_time_ms",
-                    groupby="method",
-                    save=False,
-                    linewidth=5.0,
-                    markersize=10,
-                    linestyle="None",
-                    )
+    fig = plt.figure()
 
     plt.gca().set_prop_cycle(None)
-    for method in ["edm","edm_2021","residual"]:
+    for method in ["edm","residual","edm_2021"]:
         navdata_std = navdata_plot.where("method",method)
-        # print(navdata_std[graph_type])
+        fig = glp.plot_metric(navdata_std,
+                        "measurements","mean_compute_time_ms",
+                        groupby="method",
+                        save=False,
+                        linewidth=5.0,
+                        markersize=10,
+                        linestyle="None",
+                        fig = fig,
+                        )
+    # print(navdata_std[graph_type])
         if len(navdata_std) > 1:
             plt.fill_between(navdata_std["measurements"],
                              navdata_std["mean_compute_time_ms"] - 1*navdata_std["std_compute_time_ms"],
@@ -310,6 +404,7 @@ def gsdc_timing_plots(gsdc_results_dir):
                              alpha=0.5)
     plt.yscale("log")
     plt.xlim(24,46)
+    plt.ylim(0.2,110)
     plt.xticks(range(25,46,5))
     save_figure(fig,"gsdc_measurements_mean_compute_time_ms")
 
@@ -356,19 +451,19 @@ def roc_curve(simulated_results_path):
                         linestyle="dotted",
                         fig=fig,
                         )
-        plt.gca().set_prop_cycle(None)
-        glp.plot_metric(navdata.where("glp_label",glp_label).where("method","edm_2021"),
-                        "false_alarm_rate","true_positive_rate",
-                        groupby="method_and_bias_m",
-                        avg_y=True,
-                        save=True,
-                        title="",
-                        prefix="roc_curve",
-                        linewidth=3.0,
-                        markersize=6,
-                        linestyle="--",
-                        fig=fig,
-                        )
+        # plt.gca().set_prop_cycle(None)
+        # glp.plot_metric(navdata.where("glp_label",glp_label).where("method","edm_2021"),
+        #                 "false_alarm_rate","true_positive_rate",
+        #                 groupby="method_and_bias_m",
+        #                 avg_y=True,
+        #                 save=True,
+        #                 title="",
+        #                 prefix="roc_curve",
+        #                 linewidth=3.0,
+        #                 markersize=6,
+        #                 linestyle="--",
+        #                 fig=fig,
+        #                 )
         plt.xlim(0.0,0.9)
         plt.ylim(0.0,1.0)
 
@@ -548,7 +643,8 @@ def timing_plots(simulated_results_dir):
                         )
 
         plt.gca().set_prop_cycle(None)
-        for method in ["edm","edm_2021","residual"]:
+        # for method in ["edm","edm_2021","residual"]:
+        for method in ["edm","residual"]:
             navdata_std = navdata_plot.where("method",method)
             # print(navdata_std[graph_type])
             if len(navdata_std) > 1:

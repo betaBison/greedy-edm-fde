@@ -18,6 +18,7 @@ from lib.dataset_iterators import Android2023Iterator
 # methods and thresholds to test
 METHODS = {
             "edm" : [0.4,0.45,0.5,0.52,0.54,0.55,0.56,0.58,0.6,0.65,0.7],
+            "edm_2021" : [0.,0.3,1,3,10,30,100,300],
             "residual" : [10,30,100,300,1000,3000,10000,30000,100000],
            }
 # number of processes to run at the same time
